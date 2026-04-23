@@ -13,8 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "agents"))
 _mock_model_router = MagicMock()
 _mock_model_router.ModelRouter = MagicMock()
 _mock_model_router.ModelRouter.return_value.resolve.return_value = {
-    "tier": "reasoning",
-    "default": "anthropic/claude-opus-4",
+    "model": "anthropic/claude-opus-4",
     "fallback": "openai/gpt-5",
     "max_tokens": 64000,
     "temperature": 0.2,
@@ -52,7 +51,7 @@ class TestSecretary:
         assert package["model_config"] == _mock_model_router.ModelRouter.return_value.resolve.return_value
 
         # 确保 resolve 被正确调用
-        _mock_model_router.ModelRouter.return_value.resolve.assert_called_with("cpo")
+        _mock_model_router.ModelRouter.return_value.resolve.assert_called_with("cpo", project=None)
 
     def test_context_package_structure_unchanged(self):
         """除了新增的 model_config，其他字段保持不变."""

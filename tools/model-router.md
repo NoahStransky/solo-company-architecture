@@ -16,12 +16,12 @@
 Model Router 由 Secretary 在 dispatch Agent 时使用：
 
 ```python
-from agent_orchestrator import AgentRegistry, ModelRouter
+from core.model_router import ModelRouter
 
 # Secretary dispatch
 agent_name = "cto"
 model_config = ModelRouter().resolve(agent_name, project="project-a")
-# → {"model": "anthropic/claude-opus-4", "provider": "openrouter"}
+# → {"model": "anthropic/claude-opus-4", "fallback": "openai/gpt-5", "max_tokens": 64000, "temperature": 0.2}
 
 delegate_task(
     goal="Design architecture for newsletter feature",

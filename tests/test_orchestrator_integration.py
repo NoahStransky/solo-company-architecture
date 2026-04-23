@@ -46,3 +46,37 @@ agents:
         assert package["model_config"]["fallback"] == "openai/gpt-4o"
         assert package["model_config"]["max_tokens"] == 32000
         assert package["model_config"]["temperature"] == 0.1
+
+    def test_generate_context_package_with_project_override(self, tmp_path):
+        """使用真实 ModelRouter + 项目覆盖验证 context package."""
+        # 创建临时 models.yaml
+        models_yaml = tmp_path / "models.yaml"
+        models_yaml.write_text(
+            """
+agents:
+  dev:
+    tier: coding
+    default: "anthropic/claude-sonnet-4"
+    fallback: "openai/gpt-4o"
+    max_tokens: 32000
+    temperature: 0.1
+
+projects:
+  project-a-hotspot:
+    dev:
+      model: "openai/gpt-4o"
+"""
+        )
+
+        secretary = orch.Secretary()
+        # 替换为使用临时配置的 ModelRouter
+        secretary.model_router = ModelRouter(config_path=str(models_yaml))
+
+        task = secretary.create_task("项目覆盖测试任务", ["dev"], project="project-a-hotspot")
+        package = secretary.generate_context_package(task, "dev")
+
+        assert "model_config" in package
+        assert package["model_config"]["model"] == "openai/gpt-4o"
+        assert package["model_config"]["fallback"] == "openai/gpt-4o"
+        assert package["model_config"]["max_tokens"] == 32000
+        assert package["model_config"]["temperature"] == 0.1

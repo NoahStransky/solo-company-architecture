@@ -37,6 +37,7 @@ class Task:
     outputs: Dict[str, dict] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     completed_at: Optional[str] = None
+    project: Optional[str] = None
 
 
 class AgentRegistry:
@@ -91,6 +92,14 @@ class AgentRegistry:
             "description": "数据处理、竞品研究、报告生成",
             "model_tier": "reasoning",
         },
+        "qa": {
+            "name": "QA Agent",
+            "role": "质量工程师",
+            "prompt_file": "07-qa-agent.md",
+            "output_format": "qa_report.md",
+            "description": "独立验证、测试执行、质量把关",
+            "model_tier": "fast",
+        },
     }
 
     @classmethod
@@ -128,15 +137,17 @@ class Secretary:
         data = {tid: t.__dict__ for tid, t in self.tasks.items()}
         self.tasks_file.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
-    def create_task(self, description: str, agents: List[str]) -> Task:
+    def create_task(self, description: str, agents: List[str], project: Optional[str] = None) -> Task:
         """CEO 提出需求，Secretary 创建任务。"""
         task_id = f"TASK-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        task = Task(id=task_id, description=description, agents=agents)
+        task = Task(id=task_id, description=description, agents=agents, project=project)
         self.tasks[task_id] = task
         self._save_tasks()
         print(f"[Secretary] 任务创建: {task_id}")
         print(f"[Secretary] 描述: {description}")
         print(f"[Secretary] 参与 Agent: {', '.join(agents)}")
+        if project:
+            print(f"[Secretary] 项目: {project}")
         return task
 
     def generate_context_package(self, task: Task, agent_name: str) -> dict:
@@ -163,7 +174,7 @@ class Secretary:
             "output_format": agent_info["output_format"],
             "output_requirements": self._get_output_requirements(agent_name),
             "timestamp": datetime.now().isoformat(),
-            "model_config": self.model_router.resolve(agent_name),
+            "model_config": self.model_router.resolve(agent_name, project=task.project),
         }
         return package
 
@@ -421,6 +432,10 @@ def main():
         metavar="TASK_ID",
         help="生成最终报告: --report TASK-xxx"
     )
+    parser.add_argument(
+        "--project", "-p",
+        help="项目名称，用于模型路由覆盖"
+    )
 
     args = parser.parse_args()
     secretary = Secretary()
@@ -450,7 +465,7 @@ def main():
         sys.exit(1)
     
     agents = [a.strip() for a in args.agents.split(",")]
-    task = secretary.create_task(args.task, agents)
+    task = secretary.create_task(args.task, agents, project=args.project)
 
     # 顺序生成每个 Agent 的执行包
     print(f"\n{'='*50}")
