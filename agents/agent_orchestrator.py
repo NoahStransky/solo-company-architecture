@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from core.model_router import ModelRouter
+
 WORKSPACE = Path(__file__).parent / "workspace"
 WORKSPACE.mkdir(exist_ok=True)
 
@@ -47,6 +49,7 @@ class AgentRegistry:
             "prompt_file": "01-secretary.md",
             "output_format": "task_plan.json",
             "description": "需求拆解、任务分配、进度追踪、结果汇总",
+            "model_tier": "coding",
         },
         "cpo": {
             "name": "CPO Agent",
@@ -54,6 +57,7 @@ class AgentRegistry:
             "prompt_file": "03-cpo-agent.md",
             "output_format": "prd.md",
             "description": "需求分析、PRD 撰写、用户画像",
+            "model_tier": "reasoning",
         },
         "cto": {
             "name": "CTO Agent",
@@ -61,6 +65,7 @@ class AgentRegistry:
             "prompt_file": "02-cto-agent.md",
             "output_format": "tech_spec.md",
             "description": "架构设计、技术选型、代码审查",
+            "model_tier": "reasoning",
         },
         "dev": {
             "name": "Dev Agent",
@@ -68,6 +73,7 @@ class AgentRegistry:
             "prompt_file": "05-dev-agent.md",
             "output_format": "implementation.md",
             "description": "编码实现、测试、部署",
+            "model_tier": "coding",
         },
         "growth": {
             "name": "Growth Agent",
@@ -75,6 +81,7 @@ class AgentRegistry:
             "prompt_file": "04-growth-agent.md",
             "output_format": "content_plan.md",
             "description": "内容营销、增长实验、社区运营",
+            "model_tier": "coding",
         },
         "analyst": {
             "name": "Analyst Agent",
@@ -82,6 +89,7 @@ class AgentRegistry:
             "prompt_file": "06-analyst-agent.md",
             "output_format": "analysis_report.md",
             "description": "数据处理、竞品研究、报告生成",
+            "model_tier": "reasoning",
         },
     }
 
@@ -154,6 +162,7 @@ class Secretary:
             "output_format": agent_info["output_format"],
             "output_requirements": self._get_output_requirements(agent_name),
             "timestamp": datetime.now().isoformat(),
+            "model_config": ModelRouter.resolve(agent_name),
         }
         return package
 
