@@ -115,6 +115,7 @@ class Secretary:
     def __init__(self):
         self.tasks_file = WORKSPACE / "tasks.json"
         self.tasks: Dict[str, Task] = {}
+        self.model_router = ModelRouter()
         self._load_tasks()
 
     def _load_tasks(self):
@@ -162,7 +163,7 @@ class Secretary:
             "output_format": agent_info["output_format"],
             "output_requirements": self._get_output_requirements(agent_name),
             "timestamp": datetime.now().isoformat(),
-            "model_config": ModelRouter.resolve(agent_name),
+            "model_config": self.model_router.resolve(agent_name),
         }
         return package
 

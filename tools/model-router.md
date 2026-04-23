@@ -20,7 +20,7 @@ from agent_orchestrator import AgentRegistry, ModelRouter
 
 # Secretary dispatch
 agent_name = "cto"
-model_config = ModelRouter.resolve(agent_name, project_id="project-a")
+model_config = ModelRouter().resolve(agent_name, project="project-a")
 # → {"model": "anthropic/claude-opus-4", "provider": "openrouter"}
 
 delegate_task(

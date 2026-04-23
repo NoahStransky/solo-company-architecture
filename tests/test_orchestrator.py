@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "agents"))
 # Mock ModelRouter *before* importing agent_orchestrator so the module loads
 _mock_model_router = MagicMock()
 _mock_model_router.ModelRouter = MagicMock()
-_mock_model_router.ModelRouter.resolve.return_value = {
+_mock_model_router.ModelRouter.return_value.resolve.return_value = {
     "tier": "reasoning",
     "default": "anthropic/claude-opus-4",
     "fallback": "openai/gpt-5",
@@ -49,10 +49,10 @@ class TestSecretary:
         package = secretary.generate_context_package(task, "cpo")
 
         assert "model_config" in package
-        assert package["model_config"] == _mock_model_router.ModelRouter.resolve.return_value
+        assert package["model_config"] == _mock_model_router.ModelRouter.return_value.resolve.return_value
 
         # 确保 resolve 被正确调用
-        _mock_model_router.ModelRouter.resolve.assert_called_with("cpo")
+        _mock_model_router.ModelRouter.return_value.resolve.assert_called_with("cpo")
 
     def test_context_package_structure_unchanged(self):
         """除了新增的 model_config，其他字段保持不变."""
