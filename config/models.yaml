@@ -1,0 +1,74 @@
+# Model Router Configuration
+# 不同 Agent 角色使用不同模型，按认知负载分层
+
+# 模型层级定义
+tiers:
+  reasoning:
+    description: "Deep reasoning, architecture, complex decisions"
+    models:
+      - "anthropic/claude-opus-4"
+      - "openai/gpt-5"
+      - "google/gemini-2.5-pro"
+  coding:
+    description: "Code implementation, TDD, debugging"
+    models:
+      - "anthropic/claude-sonnet-4"
+      - "openai/gpt-4o"
+      - "anthropic/claude-opus-4"
+  fast:
+    description: "Quick tasks, validation, simple queries"
+    models:
+      - "anthropic/claude-haiku-4"
+      - "openai/gpt-4o-mini"
+      - "google/gemini-2.5-flash"
+
+# Agent → Model 映射
+agents:
+  cto:
+    tier: reasoning
+    default: "anthropic/claude-opus-4"
+    fallback: "openai/gpt-5"
+    max_tokens: 64000
+    temperature: 0.2
+  dev:
+    tier: coding
+    default: "anthropic/claude-sonnet-4"
+    fallback: "openai/gpt-4o"
+    max_tokens: 32000
+    temperature: 0.1
+  qa:
+    tier: fast
+    default: "anthropic/claude-haiku-4"
+    fallback: "openai/gpt-4o-mini"
+    max_tokens: 16000
+    temperature: 0.1
+  secretary:
+    tier: coding
+    default: "anthropic/claude-sonnet-4"
+    fallback: "openai/gpt-4o"
+    max_tokens: 32000
+    temperature: 0.3
+  growth:
+    tier: coding
+    default: "openai/gpt-4o"
+    fallback: "anthropic/claude-sonnet-4"
+    max_tokens: 32000
+    temperature: 0.7
+  analyst:
+    tier: reasoning
+    default: "anthropic/claude-opus-4"
+    fallback: "openai/gpt-5"
+    max_tokens: 32000
+    temperature: 0.2
+  cpo:
+    tier: reasoning
+    default: "anthropic/claude-opus-4"
+    fallback: "openai/gpt-5"
+    max_tokens: 32000
+    temperature: 0.3
+
+# 项目级覆盖（可选）
+projects:
+  project-a-hotspot:
+    dev:
+      model: "openai/gpt-4o"  # 这个项目用 GPT 写代码

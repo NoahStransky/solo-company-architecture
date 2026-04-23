@@ -1,0 +1,42 @@
+{
+  "TASK-20260423-022850": {
+    "id": "TASK-20260423-022850",
+    "description": "给 social-hotspot-daily 添加邮件订阅功能：用户可以输入邮箱地址订阅每日科技热点摘要，每天自动发送邮件",
+    "agents": [
+      "cpo",
+      "cto",
+      "dev",
+      "growth"
+    ],
+    "status": "completed",
+    "current_phase": "growth",
+    "outputs": {
+      "cpo": {
+        "summary": "# CPO Agent 输出 — 邮件订阅功能 PRD\n\n## 用户画像（Who）\n\n**主要用户**: \"忙碌的技术从业者 Alex\"\n- 年龄: 28-40 岁\n- 职位: 开发者、技术负责人、独立开发者\n- 习惯: 每天早上通勤时快速浏览新闻\n- 痛点: 没时间打开多个平台，希望邮件直接推送精选内容\n\n**次要用户**: \"信息焦虑的初学者 Lisa\"\n- 刚入行的程序员\n- 希望系统性地了解行业动态\n- 偏好邮件这种\"被动接收\"方式\n\n## 核心痛点（Problem）\n\n1. **信息过载**: 每天需要打开 HN、Reddit、Twitter、知乎等多个平台\n2. **主动成本高**: 需要主动访问博客才能看到内容\n3. **错过重要信息**: 没有提醒机制，容易遗漏关键新闻\n4. **移动阅读体验差**: 在手机浏览器上阅读长文体验不佳\n\n## 功能优先级\n\n### Must Have（P0）\n- [ ] 邮箱订阅表单（博客页面展示）\n- [ ] 邮箱验证（防止滥用）\n- [ ] 每日自动发送邮件（HTML 格式）\n- [ ] 退订功能（法律合规）\n- [ ] 订阅者数据库（SQLite）\n\n### Nice to Have（P1）\n- [ ] 邮件内容自定义（选择感兴趣的分类）\n- [ ] 发送时间自定义\n- [ ] 邮件打开率统计\n- [ ] 每周精选（而非每日）\n\n### Future（P2）\n- [ ] 邮件模板自定义\n- [ ] 多语言邮件\n- [ ] RSS 转邮件\n\n## 用户故事\n\n1. **作为** 忙碌的开发者，**我希望** 在博客上输入邮箱就能订阅，**以便** 每天早上收到精选新闻摘要。\n2. **作为** 订阅用户，**我希望** 邮件里有新闻标题 + 一句话摘要 + 链接，**以便** 快速决定要不要深入了解。\n3. **作为** 订阅用户，**我希望** 每封邮件底部都有退订链接，**以便** 随时取消订阅。\n4. **作为** 运营者，**我希望** 邮件自动跟随博客内容生成，**以便** 不需要额外维护。\n\n## 验收标准\n\n- [ ] 用户在博客页面可以看到订阅表单\n- [ ] 输入邮箱后收到验证邮件\n- [ ] 点击验证链接后激活订阅\n- [ ] 每天 8:00 UTC 自动发送邮件给所有已验证订阅者\n- [ ] ",
+        "files": [
+          "/opt/data/home/solo-company-architecture/agents/workspace/TASK-20260423-022850_cpo_output.md"
+        ]
+      },
+      "cto": {
+        "summary": "# CTO Agent 输出 — 邮件订阅功能技术方案\n\n## 技术架构\n\n```\n┌─────────────────────────────────────────────────────────────┐\n│                    GitHub Actions (Daily)                    │\n│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │\n│  │ Collect News │→ │ Generate Blog│→ │ Send Newsletter  │   │\n│  └──────────────┘  └──────────────┘  └──────────────────┘   │\n│                                              │              │\n│                                              ▼              │\n│  ┌─────────────────────────────────────────────────────┐   │\n│  │              SQLite (subscribers.db)                 │   │\n│  │  ┌──────────────┐  ┌──────────────┐                │   │\n│  │  │ subscribers  │  │  send_log    │                │   │\n│  │  │ - email      │  │ - email      │                │   │\n│  │  │ - verified   │  │ - sent_at    │                │   │\n│  │  │ - created_at │  │ - status     │                │   │\n│  │  │ - token      │  │              │                │   │\n│  │  └───",
+        "files": [
+          "/opt/data/home/solo-company-architecture/agents/workspace/TASK-20260423-022850_cto_output.md"
+        ]
+      },
+      "dev": {
+        "summary": "# Dev Agent 输出 — 邮件订阅功能实现报告\n\n## 变更文件清单\n\n### 新增文件\n1. `newsletter/__init__.py` — 邮件模块初始化\n2. `newsletter/db.py` — 订阅者数据库管理（SQLite）\n3. `newsletter/mailer.py` — 邮件发送服务（Resend API）\n4. `templates/email.html` — 邮件 HTML 模板（暗色主题）\n5. `templates/subscribe.html` — 订阅页面\n6. `templates/verify.html` — 验证成功页面\n7. `templates/unsubscribe.html` — 退订页面\n\n### 修改文件\n1. `main.py` — 集成邮件发送流程\n2. `publishers/blog_generator.py` — 复制静态页面到 docs\n3. `templates/blog.html` — 添加订阅 CTA\n4. `.github/workflows/daily.yml` — 添加邮件相关 Secrets\n5. `requirements.txt` — 已包含所需依赖（requests, jinja2 已存在）\n\n## 核心实现逻辑\n\n### 1. 数据库层 (newsletter/db.py)\n- SQLite 存储，零运维\n- subscribers 表：email, verified, token, unsubscribed, preferences\n- send_log 表：追踪发送状态\n- 函数：add_subscriber, verify_subscriber, unsubscribe, get_verified_subscribers\n\n### 2. 邮件服务层 (newsletter/mailer.py)\n- Resend API 发送邮件（免费 3000 封/月）\n- generate_newsletter_html() — 从模板生成邮件内容\n- send_verification_email() — 发送验证邮件\n- send_newsletter() — 批量发送日报（支持 test_mode）\n\n### 3. 前端页面\n- subscribe.html — 漂",
+        "files": [
+          "/opt/data/home/solo-company-architecture/agents/workspace/TASK-20260423-022850_dev_output.md"
+        ]
+      },
+      "growth": {
+        "summary": "# Growth Agent 输出 — 邮件订阅功能推广方案\n\n## 推广文案\n\n### Twitter/X Thread\n\n```\n📧 新功能上线！\n\nTech Hotspot Daily 现在支持邮件订阅了！\n\n每天早上 8 点，精选的全球科技热点直接送到你的邮箱：\n\n✅ AI 生成的一句话摘要\n✅ 来源覆盖 HN、Reddit、Twitter、知乎、微博\n✅ \"Why it matters\" 专业洞察\n✅ 漂亮的暗色主题邮件，移动端完美显示\n✅ 随时退订，无广告\n\n适合：\n💻 忙碌的开发者\n📱 通勤时想了解行业动态\n🚀 想保持技术敏感度的 IT 从业者\n\n🔗 订阅地址：[博客链接]/subscribe.html\n\n#TechNews #AI #Developer\n```\n\n### 知乎回答模板\n\n**问题：IT 从业者如何高效获取行业资讯？**\n\n```\n作为开发者，我每天需要跟踪多个平台的新闻（HN、Reddit、Twitter、知乎...），非常耗时。\n\n最近我做了一个自动化工具，每天：\n1. 从 7 个平台抓取热点\n2. AI 筛选出最相关的科技新闻\n3. 生成一句话摘要 + 深度洞察\n4. 自动发到邮箱\n\n现在每天早上通勤时，花 5 分钟看邮件就够了。\n\n如果你也感兴趣，可以在这里订阅：[链接]\n\n完全免费，随时退订。\n```\n\n## 发布渠道建议\n\n| 渠道 | 优先级 | 内容形式 | 预期效果 |\n|------|--------|---------|---------|\n| Twitter/X | P0 | Thread + 单推 | 开发者社区 |\n| 知乎 | P0 | 回答 + 文章 | 中文技术圈 |\n| V2EX | P1 | 分享帖 | 高质量开发者 |\n| Reddit (r/webdev, r/python) | P1 | 项目展示帖 | 国际开发者 |\n| Hacker News | P1 | Show HN | 技术早期采用者 |\n| 即刻 | P2 | 动态 | 中文产品经理圈 |\n\n## 预期效果估算\n\n| 指标 | 1 周 | 1 个月 | 3 个月 |\n|------|------|--------|--------|\n| 新增订阅 | 20 | 100 | 500 |\n| 邮件打开率 | — | 45% | 50%",
+        "files": [
+          "/opt/data/home/solo-company-architecture/agents/workspace/TASK-20260423-022850_growth_output.md"
+        ]
+      }
+    },
+    "created_at": "2026-04-23T02:28:50.527988",
+    "completed_at": "2026-04-23T02:38:38.057897"
+  }
+}

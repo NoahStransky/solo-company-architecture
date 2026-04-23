@@ -1,0 +1,17 @@
+{
+  "task_id": "TASK-20260423-022850",
+  "agent": "cto",
+  "agent_role": "技术负责人",
+  "agent_description": "架构设计、技术选型、代码审查",
+  "task_description": "给 social-hotspot-daily 添加邮件订阅功能：用户可以输入邮箱地址订阅每日科技热点摘要，每天自动发送邮件",
+  "previous_outputs": {},
+  "output_format": "tech_spec.md",
+  "output_requirements": [
+    "技术架构图或文字描述",
+    "技术选型及理由",
+    "数据模型/API 设计",
+    "工作量估算（乐观/最可能/悲观）",
+    "风险评估与缓解方案"
+  ],
+  "timestamp": "2026-04-23T02:28:50.539196"
+}

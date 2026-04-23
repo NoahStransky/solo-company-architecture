@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from core.model_router import ModelRouter
+
 WORKSPACE = Path(__file__).parent / "workspace"
 WORKSPACE.mkdir(exist_ok=True)
 
@@ -35,6 +37,7 @@ class Task:
     outputs: Dict[str, dict] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     completed_at: Optional[str] = None
+    project: Optional[str] = None
 
 
 class AgentRegistry:
@@ -47,6 +50,7 @@ class AgentRegistry:
             "prompt_file": "01-secretary.md",
             "output_format": "task_plan.json",
             "description": "需求拆解、任务分配、进度追踪、结果汇总",
+            "model_tier": "coding",
         },
         "cpo": {
             "name": "CPO Agent",
@@ -54,6 +58,7 @@ class AgentRegistry:
             "prompt_file": "03-cpo-agent.md",
             "output_format": "prd.md",
             "description": "需求分析、PRD 撰写、用户画像",
+            "model_tier": "reasoning",
         },
         "cto": {
             "name": "CTO Agent",
@@ -61,6 +66,7 @@ class AgentRegistry:
             "prompt_file": "02-cto-agent.md",
             "output_format": "tech_spec.md",
             "description": "架构设计、技术选型、代码审查",
+            "model_tier": "reasoning",
         },
         "dev": {
             "name": "Dev Agent",
@@ -68,6 +74,7 @@ class AgentRegistry:
             "prompt_file": "05-dev-agent.md",
             "output_format": "implementation.md",
             "description": "编码实现、测试、部署",
+            "model_tier": "coding",
         },
         "growth": {
             "name": "Growth Agent",
@@ -75,6 +82,7 @@ class AgentRegistry:
             "prompt_file": "04-growth-agent.md",
             "output_format": "content_plan.md",
             "description": "内容营销、增长实验、社区运营",
+            "model_tier": "coding",
         },
         "analyst": {
             "name": "Analyst Agent",
@@ -82,6 +90,15 @@ class AgentRegistry:
             "prompt_file": "06-analyst-agent.md",
             "output_format": "analysis_report.md",
             "description": "数据处理、竞品研究、报告生成",
+            "model_tier": "reasoning",
+        },
+        "qa": {
+            "name": "QA Agent",
+            "role": "质量工程师",
+            "prompt_file": "07-qa-agent.md",
+            "output_format": "qa_report.md",
+            "description": "独立验证、测试执行、质量把关",
+            "model_tier": "fast",
         },
     }
 
@@ -107,6 +124,7 @@ class Secretary:
     def __init__(self):
         self.tasks_file = WORKSPACE / "tasks.json"
         self.tasks: Dict[str, Task] = {}
+        self.model_router = ModelRouter()
         self._load_tasks()
 
     def _load_tasks(self):
@@ -119,15 +137,17 @@ class Secretary:
         data = {tid: t.__dict__ for tid, t in self.tasks.items()}
         self.tasks_file.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
-    def create_task(self, description: str, agents: List[str]) -> Task:
+    def create_task(self, description: str, agents: List[str], project: Optional[str] = None) -> Task:
         """CEO 提出需求，Secretary 创建任务。"""
         task_id = f"TASK-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        task = Task(id=task_id, description=description, agents=agents)
+        task = Task(id=task_id, description=description, agents=agents, project=project)
         self.tasks[task_id] = task
         self._save_tasks()
         print(f"[Secretary] 任务创建: {task_id}")
         print(f"[Secretary] 描述: {description}")
         print(f"[Secretary] 参与 Agent: {', '.join(agents)}")
+        if project:
+            print(f"[Secretary] 项目: {project}")
         return task
 
     def generate_context_package(self, task: Task, agent_name: str) -> dict:
@@ -154,6 +174,7 @@ class Secretary:
             "output_format": agent_info["output_format"],
             "output_requirements": self._get_output_requirements(agent_name),
             "timestamp": datetime.now().isoformat(),
+            "model_config": self.model_router.resolve(agent_name, project=task.project),
         }
         return package
 
@@ -349,7 +370,7 @@ class Secretary:
             f"---",
             f"",
             f"## 📁 工作文件",
-            f"所有中间产出位于: `{WORKSPACE}/{task_id}_*"},
+            f"所有中间产出位于: `{WORKSPACE}/{task_id}_*\"`",
             f"",
         ])
 
@@ -394,10 +415,9 @@ class Secretary:
 
 def main():
     parser = argparse.ArgumentParser(description="Agent Orchestrator — AI Agent 协作调度")
-    parser.add_argument("--task", "-t", required=True, help="任务描述")
+    parser.add_argument("--task", "-t", help="任务描述")
     parser.add_argument(
         "--agents", "-a",
-        required=True,
         help="参与 Agent，逗号分隔，如: cpo,cto,dev"
     )
     parser.add_argument("--status", "-s", action="store_true", help="显示任务状态板")
@@ -411,6 +431,10 @@ def main():
         "--report",
         metavar="TASK_ID",
         help="生成最终报告: --report TASK-xxx"
+    )
+    parser.add_argument(
+        "--project", "-p",
+        help="项目名称，用于模型路由覆盖"
     )
 
     args = parser.parse_args()
@@ -436,8 +460,12 @@ def main():
         return
 
     # 创建新任务
+    if not args.task or not args.agents:
+        parser.print_help()
+        sys.exit(1)
+    
     agents = [a.strip() for a in args.agents.split(",")]
-    task = secretary.create_task(args.task, agents)
+    task = secretary.create_task(args.task, agents, project=args.project)
 
     # 顺序生成每个 Agent 的执行包
     print(f"\n{'='*50}")

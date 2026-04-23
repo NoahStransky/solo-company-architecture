@@ -1,0 +1,17 @@
+{
+  "task_id": "TASK-20260423-022850",
+  "agent": "cpo",
+  "agent_role": "产品负责人",
+  "agent_description": "需求分析、PRD 撰写、用户画像",
+  "task_description": "给 social-hotspot-daily 添加邮件订阅功能：用户可以输入邮箱地址订阅每日科技热点摘要，每天自动发送邮件",
+  "previous_outputs": {},
+  "output_format": "prd.md",
+  "output_requirements": [
+    "用户画像（Who）",
+    "核心痛点（Problem）",
+    "功能优先级（Must Have / Nice to Have）",
+    "用户故事（User Stories）",
+    "验收标准（Acceptance Criteria）"
+  ],
+  "timestamp": "2026-04-23T02:28:50.530656"
+}
