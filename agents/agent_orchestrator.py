@@ -349,7 +349,7 @@ class Secretary:
             f"---",
             f"",
             f"## 📁 工作文件",
-            f"所有中间产出位于: `{WORKSPACE}/{task_id}_*"},
+            f"所有中间产出位于: `{WORKSPACE}/{task_id}_*\"`",
             f"",
         ])
 
@@ -394,10 +394,9 @@ class Secretary:
 
 def main():
     parser = argparse.ArgumentParser(description="Agent Orchestrator — AI Agent 协作调度")
-    parser.add_argument("--task", "-t", required=True, help="任务描述")
+    parser.add_argument("--task", "-t", help="任务描述")
     parser.add_argument(
         "--agents", "-a",
-        required=True,
         help="参与 Agent，逗号分隔，如: cpo,cto,dev"
     )
     parser.add_argument("--status", "-s", action="store_true", help="显示任务状态板")
@@ -436,6 +435,10 @@ def main():
         return
 
     # 创建新任务
+    if not args.task or not args.agents:
+        parser.print_help()
+        sys.exit(1)
+    
     agents = [a.strip() for a in args.agents.split(",")]
     task = secretary.create_task(args.task, agents)
 

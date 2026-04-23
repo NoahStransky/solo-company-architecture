@@ -1,0 +1,16 @@
+{
+  "task_id": "TASK-20260423-022850",
+  "agent": "growth",
+  "agent_role": "增长负责人",
+  "agent_description": "内容营销、增长实验、社区运营",
+  "task_description": "给 social-hotspot-daily 添加邮件订阅功能：用户可以输入邮箱地址订阅每日科技热点摘要，每天自动发送邮件",
+  "previous_outputs": {},
+  "output_format": "content_plan.md",
+  "output_requirements": [
+    "推广文案",
+    "发布渠道建议",
+    "预期效果估算",
+    "内容日历更新"
+  ],
+  "timestamp": "2026-04-23T02:28:50.545023"
+}

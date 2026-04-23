@@ -1,0 +1,17 @@
+{
+  "task_id": "TASK-20260423-022850",
+  "agent": "dev",
+  "agent_role": "开发工程师",
+  "agent_description": "编码实现、测试、部署",
+  "task_description": "给 social-hotspot-daily 添加邮件订阅功能：用户可以输入邮箱地址订阅每日科技热点摘要，每天自动发送邮件",
+  "previous_outputs": {},
+  "output_format": "implementation.md",
+  "output_requirements": [
+    "变更文件清单",
+    "核心实现逻辑说明",
+    "测试用例及结果",
+    "部署步骤",
+    "已知问题清单"
+  ],
+  "timestamp": "2026-04-23T02:28:50.543118"
+}
