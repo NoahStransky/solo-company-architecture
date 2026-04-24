@@ -485,5 +485,57 @@ def main():
     print(f"{'='*50}\n")
 
 
+class Orchestrator:
+    """Agent 编排器 — 注册 SecretaryAgent 和 CTOAgent，提供自动化任务编排."""
+
+    def __init__(self, model_router: Optional[ModelRouter] = None):
+        from agents.secretary_agent import SecretaryAgent
+        from agents.cto_agent import CTOAgent
+
+        self.model_router = model_router or ModelRouter()
+        self.secretary = SecretaryAgent(model_router=self.model_router)
+        self.cto = CTOAgent(model_router=self.model_router)
+
+    def orchestrate_task(self, goal: str) -> dict:
+        """自动化编排完整任务流.
+
+        流程:
+        1. Secretary 创建任务
+        2. 分派 Dev Agent
+        3. 分派 QA Agent
+        4. CTO Review
+        5. 返回最终报告
+        """
+        # 1. Secretary 创建任务
+        task = self.secretary.create_task(goal, context={"orchestrated": True})
+
+        # 2. 分派 Dev Agent
+        dev_result = self.secretary.delegate_to_dev(task, codebase_path=".")
+
+        # 3. 分派 QA Agent
+        qa_result = self.secretary.delegate_to_qa(task, branch=dev_result.branch)
+
+        # 4. CTO Review
+        diff = f"Branch: {dev_result.branch}\nChanges: {dev_result.files_changed}"
+        review = self.cto.review_code(diff)
+
+        # 5. 返回最终报告
+        report = self.secretary.report_to_ceo(
+            f"Task {task.id} flow complete. "
+            f"Dev branch={dev_result.branch}, "
+            f"QA passed={qa_result.passed}, "
+            f"CTO verdict={review.verdict}"
+        )
+
+        return {
+            "task_id": task.id,
+            "task_status": task.status,
+            "dev_result": dev_result,
+            "qa_result": qa_result,
+            "cto_review": review,
+            "report": report,
+        }
+
+
 if __name__ == "__main__":
     main()
