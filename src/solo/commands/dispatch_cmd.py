@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import click
 
-from solo.core.dispatcher import PackageDispatcher
+from solo.core.dispatcher import build_dispatcher
 from solo.core.project import SoloProject
 from solo.core.secretary import Secretary
 from solo.core.task import AGENT, TaskPhase
@@ -40,7 +40,7 @@ def dispatch_task(
     if phase is None:
         phase = TaskPhase(name=role or "secretary", type=AGENT, role=role or "secretary")
 
-    dispatcher = PackageDispatcher(config, project.agents)
+    dispatcher = build_dispatcher("package", config, project.agents)
     package = dispatcher.prepare_phase(task, phase)
 
     project.state.add_task(task)
