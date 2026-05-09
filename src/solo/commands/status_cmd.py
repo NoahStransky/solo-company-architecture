@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 import click
 
+from solo.core.dispatcher import available_adapters
 from solo.core.project import SoloProject
 from solo.core.task import Task
 from solo.utils.ui import heading, print_json
@@ -18,6 +19,18 @@ def build_status(project: SoloProject, include_all: bool = False) -> Dict[str, A
     return {
         "project": config.project.__dict__,
         "solo_protocol_version": config.solo_protocol_version,
+        "paths": {
+            "root": str(project.path),
+            "solo_dir": str(project.solo_dir),
+            "config": str(project.config_path),
+            "tasks": str(project.state.tasks_file),
+            "events": str(project.state.events_file),
+            "artifacts": str(project.solo_dir / "artifacts"),
+        },
+        "execution": {
+            "default_adapter": config.execution.default_adapter,
+            "available_adapters": available_adapters(),
+        },
         "summary": {
             "total_tasks": len(tasks),
             "active_tasks": len(active),

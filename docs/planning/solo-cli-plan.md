@@ -460,11 +460,19 @@ Adapter 建议：
 - `solo-os` 可以通过 `events.jsonl` 看到 phase 准备情况，通过 artifact 指针按需读取完整 runtime 结果。
 - 当前验证：`docker compose run --rm test` 通过，`16 passed`。
 
+继续推进 solo-os 读取面：
+
+- `solo status --json` 新增 `paths`，暴露 project root、`.solo`、config、tasks、events、artifacts 路径。
+- `solo status --json` 新增 `execution`，暴露默认 adapter 和当前 CLI 支持的 adapter 列表。
+- 新增 `available_adapters()`，让 dashboard 或测试不用硬编码支持列表。
+- 当前验证：`docker compose run --rm test` 通过，`16 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
 - `package` adapter、`command` adapter、adapter factory 和 `manual complete` 已完成。
 - runtime 结果已经落盘，并在事件流里保留 dashboard 友好的摘要。
+- `solo status --json` 已包含 solo-os 注册和 dashboard 所需的路径与执行能力。
 - Hermes/Codex/Claude Code 先通过 `command` adapter 接入；专用 runtime adapter 进入下一阶段，不阻塞当前闭环。
 
 ### Progress Snapshot
@@ -479,6 +487,7 @@ Adapter 建议：
 | Step 6: 执行适配器 | Done for generic runtime | `ExecutionAdapter` boundary、`package` adapter、`command` adapter、`solo complete` manual phase advance 已实现；Hermes/Codex 专用 adapter 是下一阶段 |
 | Docker 测试环境 | Done | `docker compose run --rm test` 可在容器内跑测试 |
 | Runtime 可观测性 | Done | command runtime 结果写入 artifacts，phase 事件记录 dashboard 可读摘要 |
+| solo-os 读取面 | Done | `solo status --json` 暴露 paths 和 execution capabilities |
 
 当前新增能力：
 

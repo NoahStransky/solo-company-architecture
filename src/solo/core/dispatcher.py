@@ -263,6 +263,11 @@ def build_dispatcher(adapter: str, config: SoloConfig, agents: AgentRegistry) ->
     raise ValueError(f"Unknown execution adapter: {adapter}")
 
 
+def available_adapters() -> list:
+    """Return adapter names supported by this CLI build."""
+    return [PackageDispatcher.name, CommandDispatcher.name]
+
+
 def phase_event_details(package: Dict[str, Any]) -> Dict[str, Any]:
     """Build a small event payload for dashboards and status readers."""
     details: Dict[str, Any] = {
