@@ -453,10 +453,18 @@ Adapter 建议：
 - system phase 由 solo 内部生成报告，不强制外部 runtime 执行。
 - 当前验证：`docker compose run --rm test` 通过，`16 passed`。
 
+继续推进 runtime 可观测性：
+
+- command runtime 将 `command`、`returncode`、`stdout`、`stderr` 写入 `.solo/artifacts/<task_id>/<phase>_runtime.json`。
+- `phase.started` 事件记录轻量 details：adapter、agent_role、input/instruction/report/runtime_report 路径，以及 runtime returncode。
+- `solo-os` 可以通过 `events.jsonl` 看到 phase 准备情况，通过 artifact 指针按需读取完整 runtime 结果。
+- 当前验证：`docker compose run --rm test` 通过，`16 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
 - `package` adapter、`command` adapter、adapter factory 和 `manual complete` 已完成。
+- runtime 结果已经落盘，并在事件流里保留 dashboard 友好的摘要。
 - Hermes/Codex/Claude Code 先通过 `command` adapter 接入；专用 runtime adapter 进入下一阶段，不阻塞当前闭环。
 
 ### Progress Snapshot
@@ -470,6 +478,7 @@ Adapter 建议：
 | Step 5: start 薄交互层 | Done | `solo start` 已复用 dispatch/status，暂不做真实 runtime |
 | Step 6: 执行适配器 | Done for generic runtime | `ExecutionAdapter` boundary、`package` adapter、`command` adapter、`solo complete` manual phase advance 已实现；Hermes/Codex 专用 adapter 是下一阶段 |
 | Docker 测试环境 | Done | `docker compose run --rm test` 可在容器内跑测试 |
+| Runtime 可观测性 | Done | command runtime 结果写入 artifacts，phase 事件记录 dashboard 可读摘要 |
 
 当前新增能力：
 

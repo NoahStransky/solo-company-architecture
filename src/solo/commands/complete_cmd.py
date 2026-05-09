@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import click
 
-from solo.core.dispatcher import build_dispatcher
+from solo.core.dispatcher import build_dispatcher, phase_event_details
 from solo.core.project import SoloProject
 from solo.core.task import AGENT, AGENT_POOL, COMPLETED, HUMAN_GATE, IN_PROGRESS, PENDING, SKIPPED, SYSTEM, AgentInstance, Task, TaskPhase
 from solo.utils.ui import print_json, success
@@ -36,11 +36,16 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
         task.current_phase = next_phase.name
         _ensure_instances_for_phase(task, next_phase)
         _set_instances_for_phase(task, next_phase.name, IN_PROGRESS)
-        project.state.append_event("phase.started", task.id, phase=next_phase.name)
         if next_phase.type in (AGENT, AGENT_POOL, SYSTEM):
             config = project.require_config()
             dispatcher = build_dispatcher(config.execution.default_adapter, config, project.agents)
             package = dispatcher.prepare_phase(task, next_phase)
+        project.state.append_event(
+            "phase.started",
+            task.id,
+            phase=next_phase.name,
+            details=phase_event_details(package) if package else None,
+        )
 
     task.touch()
     project.state.update_task(task)
