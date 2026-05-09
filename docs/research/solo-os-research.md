@@ -14,6 +14,10 @@ solo-os 是 **可选增强层**，不是必须的。它的存在动机：
 
 > **当一个大需求需要跨多个子项目协作时，solo-os 负责拆解需求、并行派发、追踪进度、协调联调。**
 
+实现上，`solo-os` 应该放在独立项目 / 独立仓库中。它是多个 `solo` 项目的 **control plane**，而不是单项目 `solo` CLI 的子命令集合。
+
+`solo-os` 管理的是已经执行过 `solo init` 的项目。它不负责初始化单个项目的内部组织结构，也不直接拥有某个项目的 Agent prompt、workflow 或模型路由。
+
 ### 1.2 与 solo 的关系
 
 ```
@@ -39,6 +43,26 @@ solo-os 是 **可选增强层**，不是必须的。它的存在动机：
 | **必须** | ✅ 项目自带 | ❌ 可选安装 |
 | **视角** | 子公司 CEO | 集团董事会秘书 |
 | **能力** | 内部的 CTO/Dev/QA | 跨项目调度/聚合视图 |
+
+### 1.3 依赖边界
+
+`solo-os` 依赖的是稳定协议，不是 `solo` 的内部实现：
+
+```
+solo-os
+├── 读取: <project>/.solo/config.yaml
+├── 读取: <project>/.solo/state/tasks.json
+├── 读取: <project>/.solo/state/events.jsonl
+├── 读取: <project>/.solo/contracts/
+└── 可选调用: solo status --json / solo dispatch --json
+```
+
+关键原则：
+
+- `solo-os` 不 import `solo.core.*` 内部 Python 类。
+- 项目注册表放在 `~/.solo-os/projects.yaml`，不写进单个项目的 `.solo/config.yaml`。
+- 第一版 Dashboard 可以是 read-only；跨项目写操作等 `solo dispatch --json` 稳定后再接入。
+- Dashboard 是可视化运营面板，不是第二套 Jira。
 
 ---
 
@@ -163,16 +187,7 @@ solo-os
 
 dashboard:
   port: 9810
-  host: "0.0.0.0"
-
-# 项目注册（也可通过 project add 命令管理）
-projects:
-  - name: social-hotspot-daily
-    path: ~/projects/social-hotspot-daily
-    auto_scan: true
-  - name: auth-service
-    path: ~/projects/auth-service
-    auto_scan: true
+  host: "127.0.0.1"
 
 # 默认分派策略
 dispatch:
@@ -180,27 +195,41 @@ dispatch:
   max_parallel: 4
 ```
 
+```yaml
+# ~/.solo-os/projects.yaml
+# 项目注册表，由 solo-os project add/remove/scan 维护
+
+projects:
+  - name: social-hotspot-daily
+    path: ~/projects/social-hotspot-daily
+    repo: https://github.com/NoahStransky/social-hotspot-daily
+    auto_scan: true
+  - name: auth-service
+    path: ~/projects/auth-service
+    repo: https://github.com/NoahStransky/auth-service
+    auto_scan: true
+```
+
 ### 4.2 与项目 solo 配置的交互
 
-solo-os 不重复存储项目的配置，它通过读取项目下的 `.solo/config.yaml` 来获取信息：
+solo-os 不重复存储项目的配置，它通过读取项目下的 `.solo/` 协议文件来获取信息：
 
 ```python
-class SoloOSProject:
-    """表示一个已注册的 solo 项目"""
+class SoloProjectAdapter:
+    """表示一个已注册的 solo 项目；只依赖文件协议和 CLI contract."""
     
     def __init__(self, path: str):
         self.path = Path(path)
         self.config = self.load_config()       # 读取 .solo/config.yaml
         self.state = self.load_state()         # 读取 .solo/state/tasks.json
+        self.events = self.load_events()       # 读取 .solo/state/events.jsonl
     
     def dispatch(self, agent_role: str, task: str):
         """向此项目的 secretary 派任务"""
-        # 使用该项目的模型配置
-        model_config = self.config["agents"][agent_role]
-        delegate_task(
-            goal=task,
-            model=model_config,
-            context=self.config["project"],
+        # 优先通过 solo CLI 的结构化接口，而不是直接写 .solo/state
+        return run(
+            ["solo", "dispatch", "--to", agent_role, "--json", task],
+            cwd=self.path,
         )
     
     def get_status(self) -> dict:
@@ -212,6 +241,8 @@ class SoloOSProject:
             "last_updated": tasks[-1]["updated_at"] if tasks else None,
         }
 ```
+
+如果目标项目还没有稳定的 `solo dispatch --json`，`solo-os` 第一版只做 read-only dashboard 和 `status` 聚合。
 
 ### 4.3 大需求 Orchestration 设计
 
@@ -240,8 +271,8 @@ class SoloOSProject:
    │  是否确认？[y/N]                             │
    └─────────────────────────────────────────────┘
 
-4. 用户确认后 → 并行派发给各项目的 Secretary
-   → 每个子项目内部 autonomously 运行 CTO→Dev→QA
+4. 用户确认后 → 并行调用各项目的 `solo dispatch --json`
+   → 每个子项目内部按自己的 workflow 运行或生成执行包
 
 5. solo-os → 持续追踪进度
    → 定期 poll 各项目状态
@@ -259,9 +290,24 @@ class SoloOSProject:
 
 | 组件 | 选择 | 理由 |
 |------|------|------|
-| 后端框架 | FastAPI / Flask | Python 生态，与 CLI 共享代码 |
-| 前端 | 轻量 SPA（Vue/React 或纯 HTMX） | 单纯的监控面板，不需要重度前端 |
-| 实时更新 | WebSocket / SSE | 状态实时推送 |
+| 后端框架 | FastAPI | CLI 和 API 共用 project adapter / tracker |
+| 前端 | Jinja2 + HTMX（MVP） | 只读监控面板不需要重前端 |
+| 实时更新 | 轮询（MVP）→ SSE/WebSocket（后续） | 先降低复杂度，等状态协议稳定后再实时推送 |
+
+MVP Dashboard 只展示：
+
+- 已注册项目列表
+- 项目健康状态
+- 活跃任务与当前 phase
+- 最近事件
+- Orchestration 进度（后续）
+
+第一版不做：
+
+- 在 Dashboard 内编辑任务
+- 替代 GitHub Issues / Jira
+- 直接写入项目内部 `.solo/state`
+- 模型账单精算（可先保留占位，后续从 events 聚合）
 
 ### 5.2 Dashboard 页面
 
@@ -400,11 +446,11 @@ class Orchestrator:
 |------|------|--------|
 | **P0** | `project add/list/remove` — 项目注册 | 🚀 |
 | **P0** | `solo-os status` — 全局状态看板（终端） | 🚀 |
-| **P0** | `solo-os dispatch` — 跨项目派任务 | 🚀 |
-| **P1** | `solo-os orchestrate` — 大需求拆解 | ⭐ |
+| **P0** | `solo-os dashboard` — read-only Web 面板 | 🚀 |
+| **P1** | `solo-os dispatch` — 通过 `solo dispatch --json` 跨项目派任务 | ⭐ |
 | **P1** | 依赖检测 + 阻塞状态提示 | ⭐ |
-| **P2** | Web Dashboard 基础版（项目列表 + 状态卡片） | ✅ |
-| **P2** | 模型用量统计（费用追踪） | ✅ |
+| **P2** | `solo-os orchestrate` — 大需求拆解 + 用户确认 + 派发 | ✅ |
+| **P2** | 模型用量统计（从 events 聚合） | ✅ |
 | **P3** | 接口契约管理（contract） | 🌟 |
 | **P3** | Webhook / API 集成 | 🌟 |
 | **P4** | 实时 WebSocket 更新 | 🔮 |
@@ -412,15 +458,17 @@ class Orchestrator:
 
 ### 6.4 依赖关系
 
-solo-os **依赖 solo-cli**（确切地说，依赖项目的 `.solo/` 结构和 `model_router.py` 等核心模块）：
+solo-os **依赖 solo 协议**，并可选依赖 `solo` CLI：
 
 ```
 solo-os
-  └── 依赖: solo-cli (核心模型路由、Agent 逻辑)
-  └── 依赖: 每个项目的 .solo/config.yaml
+  ├── 必须依赖: 每个项目的 .solo/config.yaml
+  ├── 必须依赖: 每个项目的 .solo/state/tasks.json
+  ├── 建议依赖: 每个项目的 .solo/state/events.jsonl
+  └── 可选依赖: solo status --json / solo dispatch --json
 ```
 
-但 solo-cli 不依赖 solo-os。这是单向依赖，保持解耦。
+`solo-os` 不依赖 `solo.core.model_router`、`solo.core.secretary` 等内部模块。这样 `solo` 和 `solo-os` 可以分属两个项目，并保持清晰解耦。
 
 ---
 

@@ -1,0 +1,21 @@
+name: release
+description: Release readiness, QA, growth notes, and report.
+phases:
+  - name: qa
+    type: agent
+    role: qa
+  - name: cto_review
+    type: agent
+    role: cto
+    depends_on:
+      - qa
+  - name: growth
+    type: agent
+    role: growth
+    depends_on:
+      - cto_review
+  - name: secretary_report
+    type: system
+    role: secretary
+    depends_on:
+      - growth

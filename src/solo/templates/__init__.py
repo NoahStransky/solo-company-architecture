@@ -1,0 +1,1 @@
+"""Bundled solo templates."""

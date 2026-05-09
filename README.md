@@ -1,90 +1,136 @@
-# 🏢 Solo Company Architecture
+# Solo Company CLI
 
-> 一人公司的完整组织架构与运营体系
+`solo` turns one repository into a project-level Solo Company workspace.
 
-## 💡 核心理念
+You are the CEO. `solo start` opens a conversation with the default Secretary agent. The Secretary turns your intent into a task, asks the CTO to break it down, and prepares work for a bounded pool of Dev agents.
 
-一人公司不是"一个人做所有杂事"，而是**一个人扮演多个专业角色**，通过标准化流程（SOP）和自动化工具，实现大公司的专业产出效率。
+The first implementation is protocol-first: it creates `.solo/` state, workflows, agent prompts, and execution packages that future runtimes and `solo-os` can consume.
 
-每个角色都有明确的：
-- 📋 职责边界（Responsibilities）
-- 🎯 决策权限（Authority）
-- 📐 产出标准（Deliverables）
-- 🤖 自动化工具（Tools）
+## Install For Development
 
----
-
-## 🏛️ 组织架构
-
-```
-                    ┌─────────────┐
-                    │     CEO     │
-                    │  (你本人)   │
-                    └──────┬──────┘
-                           │
-           ┌───────────────┼───────────────┐
-           │               │               │
-    ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-    │    CTO      │ │  CPO/PM     │ │   Growth    │
-    │  技术负责人  │ │  产品负责人  │ │  增长负责人  │
-    └──────┬──────┘ └─────────────┘ └─────────────┘
-           │
-    ┌──────┼──────┐
-    │      │      │
-┌───▼──┐ ┌─▼────┐ ┌─▼────┐ ┌─▼──────┐
-│Backend│ │Frontend│ │AI/ML│ │DevOps  │
-└───────┘ └────────┘ └─────┘ └────────┘
+```bash
+python3 -m pip install -e .
 ```
 
----
+## Test With Docker Compose
 
-## 📂 目录结构
+Run tests without relying on the host Python environment:
 
-```
-solo-company-architecture/
-├── README.md                    # 本文件
-├── org-chart/                   # 组织架构详情
-│   ├── 01-ceo.md               # CEO 职责与决策框架
-│   ├── 02-cto.md               # CTO 职责与技术架构
-│   ├── 03-cpo.md               # 产品经理职责
-│   ├── 04-growth.md            # 增长运营职责
-│   └── 05-dev-roles.md         # 开发团队角色定义
-├── sops/                        # 标准操作流程
-│   ├── product-development.md  # 产品开发 SOP
-│   ├── release-process.md      # 发布流程 SOP
-│   ├── decision-matrix.md      # 决策矩阵
-│   └── weekly-review.md        # 周回顾模板
-└── tools/                       # 工具栈推荐
-    ├── dev-stack.md
-    ├── product-stack.md
-    └── automation-stack.md
+```bash
+docker compose run --rm test
 ```
 
----
+Try the CLI in an isolated workspace:
 
-## 🎭 角色速览
+```bash
+docker compose run --rm cli init --yes
+docker compose run --rm cli dispatch "Build RSS subscriptions"
+docker compose run --rm cli status --json
+```
 
-| 角色 | 核心问题 | 关键产出 | 每周投入 |
-|------|---------|---------|---------|
-| **CEO** | "我们要去哪里？" | 战略文档、OKR、融资/收入 | 20% |
-| **CTO** | "怎么技术上实现？" | 架构设计、技术选型、代码规范 | 30% |
-| **CPO/PM** | "用户真正需要什么？" | PRD、用户故事、原型 | 20% |
-| **Growth** | "怎么让更多人知道？" | 内容、SEO、社区运营 | 20% |
-| **Developer** | "怎么写出好代码？" | 功能实现、Bug 修复、文档 | 40% |
+## Quick Start
 
-> 注：投入总和 > 100% 是因为一人多岗，时间重叠利用
+```bash
+solo init --yes
+solo dispatch --workflow feature "Build RSS subscriptions"
+solo complete
+solo status
+solo status --json
+solo start
+```
 
----
+## Project Protocol
 
-## 🚀 快速开始
+After `solo init`, a project has:
 
-1. 阅读 [`org-chart/01-ceo.md`](org-chart/01-ceo.md) 理解整体框架
-2. 根据你的项目类型，重点阅读 CTO 或 CPO 文档
-3. 将 [`sops/decision-matrix.md`](sops/decision-matrix.md) 打印出来贴墙上
-4. 参考 [`tools/`](tools/) 搭建你的工具栈
+```text
+.solo/
+├── config.yaml
+├── agents/
+├── workflows/
+├── state/
+│   ├── tasks.json
+│   ├── events.jsonl
+│   └── sessions/
+├── artifacts/
+└── contracts/
+```
 
----
+`solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, and call `solo status --json` or `solo dispatch --json` when it needs structured interaction.
 
-## 📝 License
+## Runtime Shape
 
-MIT — 自由使用、修改、分享
+Default feature flow:
+
+```text
+CEO request
+  -> Secretary
+  -> CTO breakdown
+  -> bounded Dev agent pool
+  -> QA
+  -> CTO review
+  -> Secretary report
+```
+
+Dev agent count is estimated from task size and capped by:
+
+```yaml
+delegation:
+  max_parallel_dev_agents: 3
+```
+
+## Agent Providers, MCP, And Skills
+
+Configure agent routing in `.solo/config.yaml`.
+
+```yaml
+providers:
+  openai:
+    type: openai
+    api_key_env: OPENAI_API_KEY
+  anthropic:
+    type: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+
+mcp_servers:
+  filesystem:
+    enabled: true
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+
+skills:
+  architecture:
+    description: Design architecture and work packages.
+    path: skills/architecture.md
+
+agents:
+  cto:
+    provider: anthropic
+    model: claude-opus-4
+    skills: [architecture]
+    mcp_servers: [filesystem]
+  qa:
+    provider: openai
+    model: gpt-4o-mini
+    skills: [testing, code-review]
+```
+
+`solo dispatch --json` includes each agent's resolved model config, provider config, enabled MCP servers, and skill content in the generated execution package.
+
+## Current Commands
+
+```bash
+solo init
+solo dispatch
+solo complete
+solo status
+solo start
+```
+
+The MVP dispatcher writes execution packages into `.solo/artifacts/<task_id>/`. It does not yet run a real external agent runtime.
+
+## Docs
+
+- [solo CLI research](docs/research/solo-cli-research.md)
+- [solo-os research](docs/research/solo-os-research.md)
+- [solo CLI plan](docs/planning/solo-cli-plan.md)

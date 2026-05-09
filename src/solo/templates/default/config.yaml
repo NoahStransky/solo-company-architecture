@@ -1,0 +1,162 @@
+solo_protocol_version: 1
+
+project:
+  name: my-project
+  description: ""
+  version: 0.1.0
+  repo: ""
+
+providers:
+  openai:
+    type: openai
+    api_key_env: OPENAI_API_KEY
+  anthropic:
+    type: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+  google:
+    type: google
+    api_key_env: GOOGLE_API_KEY
+  openrouter:
+    type: openai-compatible
+    api_key_env: OPENROUTER_API_KEY
+    base_url: https://openrouter.ai/api/v1
+
+mcp_servers:
+  filesystem:
+    enabled: false
+    description: Read and write project files through an MCP filesystem server.
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-filesystem"
+      - .
+  git:
+    enabled: false
+    description: Inspect repository history, branches, and diffs.
+    command: uvx
+    args:
+      - mcp-server-git
+  browser:
+    enabled: false
+    description: Browser automation for local app inspection.
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-puppeteer"
+  github:
+    enabled: false
+    description: GitHub issues, pull requests, and repository metadata.
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-github"
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: GITHUB_TOKEN
+
+skills:
+  planning:
+    description: Turn CEO intent into structured plans, decisions, and next actions.
+    path: skills/planning.md
+  architecture:
+    description: Design system architecture, file ownership, risks, and work packages.
+    path: skills/architecture.md
+  implementation:
+    description: Implement scoped code changes with tests and clear file ownership.
+    path: skills/implementation.md
+  testing:
+    description: Verify behavior, run tests, and report quality risks.
+    path: skills/testing.md
+  code-review:
+    description: Review diffs for correctness, regressions, and missing tests.
+    path: skills/code-review.md
+  research:
+    description: Investigate docs, APIs, competitors, and technical options.
+    path: skills/research.md
+
+agents:
+  secretary:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.3
+    max_tokens: 32000
+    skills:
+      - planning
+    tools: []
+  cto:
+    provider: anthropic
+    model: claude-opus-4
+    temperature: 0.2
+    max_tokens: 64000
+    skills:
+      - architecture
+      - code-review
+      - research
+    mcp_servers:
+      - filesystem
+      - git
+    tools:
+      - read_files
+      - inspect_git
+  cpo:
+    provider: anthropic
+    model: claude-opus-4
+    temperature: 0.3
+    max_tokens: 32000
+    skills:
+      - planning
+      - research
+    mcp_servers:
+      - browser
+  dev:
+    provider: anthropic
+    model: claude-sonnet-4
+    temperature: 0.1
+    max_tokens: 32000
+    skills:
+      - implementation
+      - testing
+    mcp_servers:
+      - filesystem
+      - git
+    tools:
+      - edit_files
+      - run_tests
+  qa:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 16000
+    skills:
+      - testing
+      - code-review
+    mcp_servers:
+      - filesystem
+      - browser
+    tools:
+      - run_tests
+  growth:
+    provider: openai
+    model: gpt-4o
+    temperature: 0.7
+    max_tokens: 32000
+    skills:
+      - research
+    mcp_servers:
+      - browser
+  analyst:
+    provider: anthropic
+    model: claude-opus-4
+    temperature: 0.2
+    max_tokens: 32000
+    skills:
+      - research
+    mcp_servers:
+      - browser
+
+delegation:
+  max_parallel: 3
+  timeout: 300
+  max_retries: 3
+  max_parallel_dev_agents: 3
+
+default_workflow: feature
