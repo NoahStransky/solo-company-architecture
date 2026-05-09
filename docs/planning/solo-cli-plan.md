@@ -436,10 +436,17 @@ Adapter 建议：
 - 新增 Docker Compose 测试环境，主机无需 Python/pytest 即可跑测试。
 - 当前验证：`docker compose run --rm test` 通过，`11 passed`。
 
+后续增量：
+
+- 明确 `ExecutionAdapter` adapter boundary。
+- 新增 `build_dispatcher(adapter, config, agents)` adapter factory。
+- `dispatch` / `complete` 通过 adapter factory 使用 `package` adapter。
+- 新增 dispatcher adapter 测试。
+
 当前状态：
 
 - MVP 协议闭环完成。
-- `package` adapter 和 `manual complete` 已完成。
+- `package` adapter、adapter factory 和 `manual complete` 已完成。
 - Hermes/Codex/Claude Code runtime adapter 进入下一阶段，不阻塞 MVP。
 
 ### Progress Snapshot
@@ -451,7 +458,7 @@ Adapter 建议：
 | Step 3: workflow + dispatch | Done | workflow、agent registry、model router、package dispatcher、`solo dispatch` 已实现 |
 | Step 4: status | Done | `solo status` 和 `solo status --json` 已实现 |
 | Step 5: start 薄交互层 | Done | `solo start` 已复用 dispatch/status，暂不做真实 runtime |
-| Step 6: 执行适配器 | In progress | `package` adapter 已实现；`solo complete` 提供 manual phase advance；Hermes/Codex adapter 未实现 |
+| Step 6: 执行适配器 | Done for MVP | `ExecutionAdapter` boundary、`package` adapter、`solo complete` manual phase advance 已实现；Hermes/Codex adapter 是下一阶段 |
 | Docker 测试环境 | Done | `docker compose run --rm test` 可在容器内跑测试 |
 
 当前新增能力：
@@ -576,6 +583,7 @@ tests/test_solo/
 ├── test_state.py
 ├── test_workflow.py
 ├── test_dispatch.py
+├── test_dispatcher.py
 ├── test_complete.py
 └── test_status.py
 ```

@@ -1,5 +1,6 @@
 """Execution package generation."""
 
+from abc import ABC, abstractmethod
 import json
 from pathlib import Path
 from typing import Any, Dict
@@ -10,8 +11,20 @@ from .model_router import ModelRouter
 from .task import AGENT_POOL, SYSTEM, Task, TaskPhase
 
 
-class PackageDispatcher:
+class ExecutionAdapter(ABC):
+    """Adapter boundary for preparing or running a task phase."""
+
+    name: str
+
+    @abstractmethod
+    def prepare_phase(self, task: Task, phase: TaskPhase) -> Dict[str, Any]:
+        """Prepare or execute a phase and return structured metadata."""
+
+
+class PackageDispatcher(ExecutionAdapter):
     """MVP dispatcher that writes agent instructions instead of running a model."""
+
+    name = "package"
 
     def __init__(self, config: SoloConfig, agents: AgentRegistry):
         self.config = config
@@ -164,3 +177,10 @@ class PackageDispatcher:
             f"- `{name}`: `{config.get('command', '')} {' '.join(config.get('args', []))}`"
             for name, config in mcp_servers.items()
         ]
+
+
+def build_dispatcher(adapter: str, config: SoloConfig, agents: AgentRegistry) -> ExecutionAdapter:
+    """Create an execution adapter by name."""
+    if adapter == PackageDispatcher.name:
+        return PackageDispatcher(config, agents)
+    raise ValueError(f"Unknown execution adapter: {adapter}")
