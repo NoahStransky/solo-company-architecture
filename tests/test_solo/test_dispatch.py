@@ -82,4 +82,14 @@ def test_dispatch_command_adapter_runs_configured_command():
         package = payload["package"]
         assert package["adapter"] == "command"
         assert package["runtime"]["returncode"] == 0
+        assert Path(package["runtime_report"]).exists()
         assert Path(payload["task"]["artifacts_dir"], "runtime.txt").read_text() == "cto_breakdown"
+        events = [
+            json.loads(line)
+            for line in Path(".solo/state/events.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        phase_started = [event for event in events if event["event"] == "phase.started"][-1]
+        assert phase_started["details"]["adapter"] == "command"
+        assert phase_started["details"]["runtime_returncode"] == 0
+        assert Path(phase_started["details"]["runtime_report"]).exists()

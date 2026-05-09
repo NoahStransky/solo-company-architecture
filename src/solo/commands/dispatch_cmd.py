@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import click
 
-from solo.core.dispatcher import build_dispatcher
+from solo.core.dispatcher import build_dispatcher, phase_event_details
 from solo.core.project import SoloProject
 from solo.core.secretary import Secretary
 from solo.core.task import AGENT, TaskPhase
@@ -47,7 +47,7 @@ def dispatch_task(
 
     project.state.add_task(task)
     project.state.append_event("task.created", task.id, phase=task.current_phase)
-    project.state.append_event("phase.started", task.id, phase=task.current_phase, details={"agent_role": package["agent_role"]})
+    project.state.append_event("phase.started", task.id, phase=task.current_phase, details=phase_event_details(package))
 
     return {
         "task": task.to_dict(),

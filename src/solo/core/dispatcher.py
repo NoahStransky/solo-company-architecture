@@ -228,15 +228,19 @@ class CommandDispatcher(ExecutionAdapter):
             timeout=runtime.timeout,
             check=False,
         )
-
-        result = dict(package_result)
-        result["adapter"] = self.name
-        result["runtime"] = {
+        runtime_result = {
             "command": command,
             "returncode": completed.returncode,
             "stdout": completed.stdout,
             "stderr": completed.stderr,
         }
+        runtime_path = Path(task.artifacts_dir) / f"{phase.name}_runtime.json"
+        runtime_path.write_text(json.dumps(runtime_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        result = dict(package_result)
+        result["adapter"] = self.name
+        result["runtime"] = runtime_result
+        result["runtime_report"] = str(runtime_path)
         return result
 
     def _format_arg(self, arg: str, package_result: Dict[str, Any], task: Task, phase: TaskPhase) -> str:
@@ -257,3 +261,20 @@ def build_dispatcher(adapter: str, config: SoloConfig, agents: AgentRegistry) ->
     if adapter == CommandDispatcher.name:
         return CommandDispatcher(config, agents)
     raise ValueError(f"Unknown execution adapter: {adapter}")
+
+
+def phase_event_details(package: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a small event payload for dashboards and status readers."""
+    details: Dict[str, Any] = {
+        "adapter": package.get("adapter", ""),
+        "agent_role": package.get("agent_role", ""),
+    }
+    for key in ("input", "instruction", "report", "runtime_report"):
+        if package.get(key):
+            details[key] = package[key]
+    runtime = package.get("runtime") or {}
+    if "returncode" in runtime:
+        details["runtime_returncode"] = runtime["returncode"]
+    if runtime.get("skipped"):
+        details["runtime_skipped"] = runtime["skipped"]
+    return {key: value for key, value in details.items() if value not in ("", None)}
