@@ -33,6 +33,7 @@ docker compose run --rm cli status --json
 ```bash
 solo init --yes
 solo dispatch --workflow feature "Build RSS subscriptions"
+solo dispatch --adapter command --json "Run with an external runtime"
 solo complete
 solo status
 solo status --json
@@ -117,6 +118,24 @@ agents:
 
 `solo dispatch --json` includes each agent's resolved model config, provider config, enabled MCP servers, and skill content in the generated execution package.
 
+## Execution Adapters
+
+The default `package` adapter writes execution packages into `.solo/artifacts/<task_id>/`.
+
+Use the generic `command` adapter when you want `solo` to hand the prepared package to an external runtime such as Hermes, Codex, Claude Code, or a local wrapper script:
+
+```yaml
+execution:
+  default_adapter: package
+  command:
+    command: hermes
+    args: ["run", "--input", "{input}", "--instruction", "{instruction}"]
+    timeout: 300
+    env: {}
+```
+
+`command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
+
 ## Current Commands
 
 ```bash
@@ -127,7 +146,7 @@ solo status
 solo start
 ```
 
-The MVP dispatcher writes execution packages into `.solo/artifacts/<task_id>/`. It does not yet run a real external agent runtime.
+The protocol-first dispatcher can either generate packages for manual completion or run a configured external command adapter.
 
 ## Docs
 

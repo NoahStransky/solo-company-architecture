@@ -411,8 +411,9 @@ Adapter 建议：
 |---------|------|------|
 | `package` | MVP | 只生成执行包和指令文件 |
 | `manual` | MVP | 用户把结果放回 artifacts 后标记完成 |
-| `hermes` | 后续 | 接 `delegate_task` |
-| `codex` / `claude-code` | 后续 | 接外部 coding agent |
+| `command` | 当前阶段 | 用通用命令适配器接 Hermes / Codex / Claude Code / 本地 wrapper |
+| `hermes` | 后续 | 如需要更深集成，再接 `delegate_task` |
+| `codex` / `claude-code` | 后续 | 如需要专用协议，再接外部 coding agent |
 
 ---
 
@@ -443,11 +444,20 @@ Adapter 建议：
 - `dispatch` / `complete` 通过 adapter factory 使用 `package` adapter。
 - 新增 dispatcher adapter 测试。
 
+继续推进：
+
+- 新增 `execution.default_adapter` 和 `execution.command` 配置协议。
+- 新增通用 `command` adapter，先生成标准执行包，再把 `{input}`、`{instruction}`、`{output_dir}` 等路径交给外部命令。
+- `solo dispatch --adapter command` 可以临时覆盖项目默认 adapter。
+- command runtime 会注入 `SOLO_TASK_ID`、`SOLO_PHASE`、`SOLO_AGENT_ROLE`、`SOLO_PACKAGE_INPUT`、`SOLO_PACKAGE_INSTRUCTION`、`SOLO_OUTPUT_DIR`。
+- system phase 由 solo 内部生成报告，不强制外部 runtime 执行。
+- 当前验证：`docker compose run --rm test` 通过，`16 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
-- `package` adapter、adapter factory 和 `manual complete` 已完成。
-- Hermes/Codex/Claude Code runtime adapter 进入下一阶段，不阻塞 MVP。
+- `package` adapter、`command` adapter、adapter factory 和 `manual complete` 已完成。
+- Hermes/Codex/Claude Code 先通过 `command` adapter 接入；专用 runtime adapter 进入下一阶段，不阻塞当前闭环。
 
 ### Progress Snapshot
 
@@ -458,7 +468,7 @@ Adapter 建议：
 | Step 3: workflow + dispatch | Done | workflow、agent registry、model router、package dispatcher、`solo dispatch` 已实现 |
 | Step 4: status | Done | `solo status` 和 `solo status --json` 已实现 |
 | Step 5: start 薄交互层 | Done | `solo start` 已复用 dispatch/status，暂不做真实 runtime |
-| Step 6: 执行适配器 | Done for MVP | `ExecutionAdapter` boundary、`package` adapter、`solo complete` manual phase advance 已实现；Hermes/Codex adapter 是下一阶段 |
+| Step 6: 执行适配器 | Done for generic runtime | `ExecutionAdapter` boundary、`package` adapter、`command` adapter、`solo complete` manual phase advance 已实现；Hermes/Codex 专用 adapter 是下一阶段 |
 | Docker 测试环境 | Done | `docker compose run --rm test` 可在容器内跑测试 |
 
 当前新增能力：
@@ -558,7 +568,8 @@ solo start
 | 定义 adapter interface | `src/solo/core/dispatcher.py` |
 | `package` adapter | `src/solo/core/dispatcher.py` |
 | `manual complete` 命令或内部 API | `src/solo/commands/complete_cmd.py` |
-| Hermes / Codex adapter | 后续 |
+| `command` runtime adapter | `src/solo/core/dispatcher.py` |
+| Hermes / Codex 专用 adapter | 后续 |
 
 ---
 
@@ -641,3 +652,9 @@ docker compose run --rm test
 ```
 
 这个闭环完成后，`solo-os` 就可以在另一个项目里开始做 read-only dashboard：注册项目、读取 `.solo/config.yaml`、`.solo/state/tasks.json`、`.solo/state/events.jsonl`，展示全局状态。
+
+如果要先验证外部 runtime，可以把 `.solo/config.yaml` 的 `execution.default_adapter` 改成 `command`，或单次运行：
+
+```bash
+solo dispatch --adapter command --json "实现 RSS 订阅功能"
+```

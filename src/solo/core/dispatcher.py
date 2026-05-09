@@ -2,7 +2,9 @@
 
 from abc import ABC, abstractmethod
 import json
+import os
 from pathlib import Path
+import subprocess
 from typing import Any, Dict
 
 from .agent_registry import AgentRegistry
@@ -179,8 +181,79 @@ class PackageDispatcher(ExecutionAdapter):
         ]
 
 
+class CommandDispatcher(ExecutionAdapter):
+    """Runtime adapter that executes a configured external command."""
+
+    name = "command"
+
+    def __init__(self, config: SoloConfig, agents: AgentRegistry):
+        self.config = config
+        self.package_dispatcher = PackageDispatcher(config, agents)
+
+    def prepare_phase(self, task: Task, phase: TaskPhase) -> Dict[str, Any]:
+        package_result = self.package_dispatcher.prepare_phase(task, phase)
+        if package_result.get("system"):
+            package_result["adapter"] = self.name
+            package_result["runtime"] = {"skipped": "system phase"}
+            return package_result
+
+        runtime = self.config.execution.command
+        if not runtime.command:
+            raise ValueError("execution.command.command is required for command adapter")
+
+        env = os.environ.copy()
+        env.update(runtime.env)
+        env.update({
+            "SOLO_TASK_ID": task.id,
+            "SOLO_PHASE": phase.name,
+            "SOLO_AGENT_ROLE": package_result["agent_role"],
+            "SOLO_PACKAGE_INPUT": package_result["input"],
+            "SOLO_PACKAGE_INSTRUCTION": package_result["instruction"],
+            "SOLO_OUTPUT_DIR": str(Path(task.artifacts_dir)),
+        })
+
+        command = [
+            runtime.command,
+            *[
+                self._format_arg(arg, package_result, task, phase)
+                for arg in runtime.args
+            ],
+        ]
+        completed = subprocess.run(
+            command,
+            cwd=Path(task.artifacts_dir),
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=runtime.timeout,
+            check=False,
+        )
+
+        result = dict(package_result)
+        result["adapter"] = self.name
+        result["runtime"] = {
+            "command": command,
+            "returncode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
+        return result
+
+    def _format_arg(self, arg: str, package_result: Dict[str, Any], task: Task, phase: TaskPhase) -> str:
+        return arg.format(
+            task_id=task.id,
+            phase=phase.name,
+            agent_role=package_result["agent_role"],
+            input=package_result.get("input", ""),
+            instruction=package_result.get("instruction", ""),
+            output_dir=str(Path(task.artifacts_dir)),
+        )
+
+
 def build_dispatcher(adapter: str, config: SoloConfig, agents: AgentRegistry) -> ExecutionAdapter:
     """Create an execution adapter by name."""
     if adapter == PackageDispatcher.name:
         return PackageDispatcher(config, agents)
+    if adapter == CommandDispatcher.name:
+        return CommandDispatcher(config, agents)
     raise ValueError(f"Unknown execution adapter: {adapter}")

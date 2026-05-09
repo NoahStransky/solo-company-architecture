@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
+import sys
 
 from click.testing import CliRunner
+import yaml
 
 from solo.cli import main
 
@@ -54,3 +56,30 @@ def test_dispatch_direct_role():
         assert payload["task"]["workflow"] == "direct:cto"
         assert payload["task"]["current_phase"] == "cto"
         assert payload["package"]["agent_role"] == "cto"
+
+
+def test_dispatch_command_adapter_runs_configured_command():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        config_path = Path(".solo/config.yaml")
+        config = yaml.safe_load(config_path.read_text())
+        config["execution"]["command"] = {
+            "command": sys.executable,
+            "args": [
+                "-c",
+                "import os, pathlib; pathlib.Path(os.environ['SOLO_OUTPUT_DIR'], 'runtime.txt').write_text(os.environ['SOLO_PHASE'])",
+            ],
+            "timeout": 30,
+            "env": {},
+        }
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False))
+
+        result = runner.invoke(main, ["dispatch", "--adapter", "command", "--json", "Run command adapter"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        package = payload["package"]
+        assert package["adapter"] == "command"
+        assert package["runtime"]["returncode"] == 0
+        assert Path(payload["task"]["artifacts_dir"], "runtime.txt").read_text() == "cto_breakdown"

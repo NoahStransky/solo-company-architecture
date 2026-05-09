@@ -38,7 +38,8 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
         _set_instances_for_phase(task, next_phase.name, IN_PROGRESS)
         project.state.append_event("phase.started", task.id, phase=next_phase.name)
         if next_phase.type in (AGENT, AGENT_POOL, SYSTEM):
-            dispatcher = build_dispatcher("package", project.require_config(), project.agents)
+            config = project.require_config()
+            dispatcher = build_dispatcher(config.execution.default_adapter, config, project.agents)
             package = dispatcher.prepare_phase(task, next_phase)
 
     task.touch()

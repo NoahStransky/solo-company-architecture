@@ -159,4 +159,12 @@ delegation:
   max_retries: 3
   max_parallel_dev_agents: 3
 
+execution:
+  default_adapter: package
+  command:
+    command: ""
+    args: []
+    timeout: 300
+    env: {}
+
 default_workflow: feature

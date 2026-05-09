@@ -130,6 +130,36 @@ class DelegationConfig:
 
 
 @dataclass
+class CommandRuntimeConfig:
+    command: str = ""
+    args: List[str] = field(default_factory=list)
+    timeout: int = 300
+    env: Dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CommandRuntimeConfig":
+        return cls(
+            command=str(data.get("command", "")),
+            args=[str(item) for item in data.get("args", [])],
+            timeout=int(data.get("timeout", 300)),
+            env={str(key): str(value) for key, value in (data.get("env") or {}).items()},
+        )
+
+
+@dataclass
+class ExecutionConfig:
+    default_adapter: str = "package"
+    command: CommandRuntimeConfig = field(default_factory=CommandRuntimeConfig)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ExecutionConfig":
+        return cls(
+            default_adapter=str(data.get("default_adapter", "package")),
+            command=CommandRuntimeConfig.from_dict(data.get("command") or {}),
+        )
+
+
+@dataclass
 class SoloConfig:
     project: ProjectConfig
     agents: Dict[str, AgentConfig]
@@ -137,6 +167,7 @@ class SoloConfig:
     mcp_servers: Dict[str, MCPServerConfig] = field(default_factory=dict)
     skills: Dict[str, SkillConfig] = field(default_factory=dict)
     delegation: DelegationConfig = field(default_factory=DelegationConfig)
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     default_workflow: str = "feature"
     solo_protocol_version: int = SOLO_PROTOCOL_VERSION
 
@@ -165,6 +196,7 @@ class SoloConfig:
                 for name, value in (data.get("skills") or {}).items()
             },
             delegation=DelegationConfig.from_dict(data.get("delegation") or {}),
+            execution=ExecutionConfig.from_dict(data.get("execution") or {}),
             default_workflow=str(data.get("default_workflow", "feature")),
             solo_protocol_version=version,
         )
@@ -178,6 +210,7 @@ class SoloConfig:
             "skills": {name: asdict(config) for name, config in self.skills.items()},
             "agents": {name: asdict(config) for name, config in self.agents.items()},
             "delegation": asdict(self.delegation),
+            "execution": asdict(self.execution),
             "default_workflow": self.default_workflow,
         }
 
