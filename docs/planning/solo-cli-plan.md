@@ -39,6 +39,7 @@
 | `.solo/config.yaml` | 项目信息、Agent 模型配置、协议版本 |
 | `.solo/state/tasks.json` | 当前任务快照 |
 | `.solo/state/events.jsonl` | 追加式事件日志 |
+| `.solo/state/messages.jsonl` | Agent 间 durable mailbox |
 | `.solo/artifacts/<task_id>/` | 每个任务的阶段输入、输出和报告 |
 
 ### MVP 不包含
@@ -117,6 +118,7 @@ my-project/
 │   ├── state/
 │   │   ├── tasks.json
 │   │   ├── events.jsonl
+│   │   ├── messages.jsonl
 │   │   └── sessions/
 │   ├── artifacts/
 │   └── contracts/
@@ -467,12 +469,22 @@ Adapter 建议：
 - 新增 `available_adapters()`，让 dashboard 或测试不用硬编码支持列表。
 - 当前验证：`docker compose run --rm test` 通过，`16 passed`。
 
+继续推进 Agent 通信：
+
+- 新增 `.solo/state/messages.jsonl`，作为 Agent 间 durable mailbox。
+- `dispatch` 写入 `ceo -> secretary` request 和 `secretary -> 当前执行 agent` assignment。
+- `complete` 在 phase 推进时写入当前 agent 到下一 agent 的 handoff；任务结束时写入 agent -> CEO result。
+- `solo status --json` 新增 `recent_messages`，并在 `paths.messages` 暴露 mailbox 路径。
+- message 只保存路由、摘要和 artifact 指针，正文继续放在 `.solo/artifacts/<task_id>/`。
+- 当前验证：`docker compose run --rm test` 通过，`16 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
 - `package` adapter、`command` adapter、adapter factory 和 `manual complete` 已完成。
 - runtime 结果已经落盘，并在事件流里保留 dashboard 友好的摘要。
 - `solo status --json` 已包含 solo-os 注册和 dashboard 所需的路径与执行能力。
+- Agent 之间的任务分派和交接已经通过 `messages.jsonl` 可追踪。
 - Hermes/Codex/Claude Code 先通过 `command` adapter 接入；专用 runtime adapter 进入下一阶段，不阻塞当前闭环。
 
 ### Progress Snapshot
@@ -488,6 +500,7 @@ Adapter 建议：
 | Docker 测试环境 | Done | `docker compose run --rm test` 可在容器内跑测试 |
 | Runtime 可观测性 | Done | command runtime 结果写入 artifacts，phase 事件记录 dashboard 可读摘要 |
 | solo-os 读取面 | Done | `solo status --json` 暴露 paths 和 execution capabilities |
+| Agent durable mailbox | Done | `.solo/state/messages.jsonl` 已接入 dispatch/complete/status，并通过容器测试 |
 
 当前新增能力：
 

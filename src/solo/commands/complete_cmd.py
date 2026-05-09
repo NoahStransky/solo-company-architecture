@@ -31,6 +31,15 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
         task.status = COMPLETED
         task.current_phase = ""
         project.state.append_event("task.completed", task.id)
+        project.state.append_message(
+            task.id,
+            from_agent=_phase_actor(phase),
+            to_agent="ceo",
+            message_type="result",
+            phase=phase.name,
+            summary=f"{phase.name} completed for {task.title}",
+            artifact=str(Path(task.artifacts_dir) / f"{phase.name}_output.md"),
+        )
     else:
         next_phase.status = IN_PROGRESS
         task.current_phase = next_phase.name
@@ -44,6 +53,16 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
             "phase.started",
             task.id,
             phase=next_phase.name,
+            details=phase_event_details(package) if package else None,
+        )
+        project.state.append_message(
+            task.id,
+            from_agent=_phase_actor(phase),
+            to_agent=_phase_actor(next_phase),
+            message_type="handoff",
+            phase=next_phase.name,
+            summary=f"{phase.name} completed; {next_phase.name} is ready for {task.title}",
+            artifact=(package or {}).get("instruction", (package or {}).get("report", "")),
             details=phase_event_details(package) if package else None,
         )
 
@@ -105,6 +124,12 @@ def _ensure_instances_for_phase(task: Task, phase: TaskPhase) -> None:
         role = phase.role or phase.name
         for instance_id in phase.instance_ids:
             task.agent_instances.append(AgentInstance(id=instance_id, role=role, phase=phase.name, status=PENDING))
+
+
+def _phase_actor(phase: TaskPhase) -> str:
+    if phase.type == HUMAN_GATE:
+        return "ceo"
+    return phase.role or phase.name
 
 
 @click.command("complete")

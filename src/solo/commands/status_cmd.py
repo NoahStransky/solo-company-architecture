@@ -25,6 +25,7 @@ def build_status(project: SoloProject, include_all: bool = False) -> Dict[str, A
             "config": str(project.config_path),
             "tasks": str(project.state.tasks_file),
             "events": str(project.state.events_file),
+            "messages": str(project.state.messages_file),
             "artifacts": str(project.solo_dir / "artifacts"),
         },
         "execution": {
@@ -38,6 +39,7 @@ def build_status(project: SoloProject, include_all: bool = False) -> Dict[str, A
         },
         "tasks": [task.to_dict() for task in selected],
         "recent_events": project.state.load_events(limit=10),
+        "recent_messages": project.state.load_messages(limit=10),
     }
 
 

@@ -48,6 +48,24 @@ def dispatch_task(
     project.state.add_task(task)
     project.state.append_event("task.created", task.id, phase=task.current_phase)
     project.state.append_event("phase.started", task.id, phase=task.current_phase, details=phase_event_details(package))
+    project.state.append_message(
+        task.id,
+        from_agent="ceo",
+        to_agent="secretary",
+        message_type="request",
+        phase=task.current_phase,
+        summary=task.title,
+    )
+    project.state.append_message(
+        task.id,
+        from_agent="secretary",
+        to_agent=package["agent_role"],
+        message_type="assignment",
+        phase=task.current_phase,
+        summary=f"Prepare {task.current_phase} for {task.title}",
+        artifact=package.get("instruction", package.get("report", "")),
+        details=phase_event_details(package),
+    )
 
     return {
         "task": task.to_dict(),

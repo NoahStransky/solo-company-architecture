@@ -18,6 +18,7 @@ class StateStore:
         self.state_dir = solo_dir / "state"
         self.tasks_file = self.state_dir / "tasks.json"
         self.events_file = self.state_dir / "events.jsonl"
+        self.messages_file = self.state_dir / "messages.jsonl"
         self.lock_file = self.state_dir / ".lock"
 
     def init(self) -> None:
@@ -26,6 +27,8 @@ class StateStore:
             self.save_tasks([])
         if not self.events_file.exists():
             self.events_file.write_text("", encoding="utf-8")
+        if not self.messages_file.exists():
+            self.messages_file.write_text("", encoding="utf-8")
 
     def load_tasks(self) -> List[Task]:
         if not self.tasks_file.exists():
@@ -94,6 +97,53 @@ class StateStore:
         if limit is not None:
             return events[-limit:]
         return events
+
+    def append_message(
+        self,
+        task_id: str,
+        from_agent: str,
+        to_agent: str,
+        message_type: str,
+        phase: str = "",
+        summary: str = "",
+        artifact: str = "",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        payload: Dict[str, Any] = {
+            "ts": utc_now_iso(),
+            "task_id": task_id,
+            "from": from_agent,
+            "to": to_agent,
+            "type": message_type,
+        }
+        if phase:
+            payload["phase"] = phase
+        if summary:
+            payload["summary"] = summary
+        if artifact:
+            payload["artifact"] = artifact
+        if details:
+            payload["details"] = details
+        with self.locked():
+            with self.messages_file.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    def load_messages(self, limit: Optional[int] = None, task_id: str = "") -> List[Dict[str, Any]]:
+        if not self.messages_file.exists():
+            return []
+        messages = []
+        with self.messages_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                message = json.loads(line)
+                if not task_id or message.get("task_id") == task_id:
+                    messages.append(message)
+        if limit is not None:
+            return messages[-limit:]
+        return messages
 
     @contextlib.contextmanager
     def locked(self) -> Iterator[None]:

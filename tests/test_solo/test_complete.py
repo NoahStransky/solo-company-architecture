@@ -22,6 +22,34 @@ def test_complete_advances_to_dev_pool_after_cto_breakdown():
         assert task["current_phase"] == "dev_pool"
         assert payload["package"]["phase"] == "dev_pool"
         assert Path(payload["package"]["instruction"]).exists()
+        messages = [
+            json.loads(line)
+            for line in Path(".solo/state/messages.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        handoff = messages[-1]
+        assert handoff["type"] == "handoff"
+        assert handoff["from"] == "cto"
+        assert handoff["to"] == "dev"
+        assert handoff["phase"] == "dev_pool"
+        assert Path(handoff["artifact"]).exists()
+
+        result = runner.invoke(main, ["complete", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["completed_phase"] == "dev_pool"
+        assert payload["next_phase"]["name"] == "qa"
+        messages = [
+            json.loads(line)
+            for line in Path(".solo/state/messages.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        handoff = messages[-1]
+        assert handoff["type"] == "handoff"
+        assert handoff["from"] == "dev"
+        assert handoff["to"] == "qa"
+        assert handoff["phase"] == "qa"
 
 
 def test_complete_can_finish_direct_task():
@@ -37,3 +65,11 @@ def test_complete_can_finish_direct_task():
         payload = json.loads(result.output)
         assert payload["next_phase"] is None
         assert payload["task"]["status"] == "completed"
+        messages = [
+            json.loads(line)
+            for line in Path(".solo/state/messages.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        assert messages[-1]["type"] == "result"
+        assert messages[-1]["from"] == "cto"
+        assert messages[-1]["to"] == "ceo"
