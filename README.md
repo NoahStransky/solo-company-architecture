@@ -57,7 +57,7 @@ After `solo init`, a project has:
 └── contracts/
 ```
 
-`solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, and call `solo status --json` or `solo dispatch --json` when it needs structured interaction.
+`solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, and call `solo status --json` or `solo dispatch --json` when it needs structured interaction. `solo status --json` also exposes project paths and execution adapter capabilities for dashboard registration.
 
 ## Runtime Shape
 
