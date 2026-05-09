@@ -1,0 +1,30 @@
+name: solo-company
+
+x-solo-image: &solo-image
+  image: solo-company:dev
+  pull_policy: build
+  build:
+    context: .
+    dockerfile: Dockerfile
+
+services:
+  test:
+    <<: *solo-image
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      PYTHONPATH: /app/src
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: python -m pytest tests/test_solo -q
+
+  cli:
+    <<: *solo-image
+    working_dir: /workspace
+    volumes:
+      - .:/app
+      - ./tmp/workspace:/workspace
+    environment:
+      PYTHONPATH: /app/src
+    entrypoint: ["python", "-m", "solo"]
+    command: ["--help"]
