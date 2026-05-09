@@ -18,6 +18,7 @@ def test_init_creates_solo_protocol_files():
         assert Path(".solo/workflows/feature.yaml").exists()
         assert Path(".solo/state/tasks.json").exists()
         assert Path(".solo/state/events.jsonl").exists()
+        assert Path(".solo/state/messages.jsonl").exists()
         assert Path(".solo/artifacts").is_dir()
         assert Path(".soloignore").exists()
 

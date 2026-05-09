@@ -42,6 +42,17 @@ def test_dispatch_creates_cto_package_and_task_state():
         assert state["schema_version"] == 1
         assert state["tasks"][0]["id"] == task["id"]
         assert Path(".solo/state/events.jsonl").read_text().count("phase.started") == 1
+        messages = [
+            json.loads(line)
+            for line in Path(".solo/state/messages.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        assert [message["type"] for message in messages] == ["request", "assignment"]
+        assert messages[0]["from"] == "ceo"
+        assert messages[0]["to"] == "secretary"
+        assert messages[1]["from"] == "secretary"
+        assert messages[1]["to"] == "cto"
+        assert Path(messages[1]["artifact"]).exists()
 
 
 def test_dispatch_direct_role():

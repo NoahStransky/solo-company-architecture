@@ -52,12 +52,13 @@ After `solo init`, a project has:
 ├── state/
 │   ├── tasks.json
 │   ├── events.jsonl
+│   ├── messages.jsonl
 │   └── sessions/
 ├── artifacts/
 └── contracts/
 ```
 
-`solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, and call `solo status --json` or `solo dispatch --json` when it needs structured interaction. `solo status --json` also exposes project paths and execution adapter capabilities for dashboard registration.
+`solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, `state/messages.jsonl`, and call `solo status --json` or `solo dispatch --json` when it needs structured interaction. `solo status --json` also exposes project paths and execution adapter capabilities for dashboard registration.
 
 ## Runtime Shape
 
@@ -79,6 +80,8 @@ Dev agent count is estimated from task size and capped by:
 delegation:
   max_parallel_dev_agents: 3
 ```
+
+Agent communication uses a durable mailbox in `.solo/state/messages.jsonl`. Messages only store routing metadata and artifact pointers; large task briefs, instructions, runtime output, implementation reports, and QA reports stay in `.solo/artifacts/<task_id>/`.
 
 ## Agent Providers, MCP, And Skills
 

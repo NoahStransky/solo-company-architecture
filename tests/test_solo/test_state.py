@@ -23,13 +23,26 @@ def test_state_store_round_trips_tasks_and_events(tmp_path):
 
     store.add_task(task)
     store.append_event("task.created", task.id, phase="cto_breakdown")
+    store.append_message(
+        task.id,
+        from_agent="secretary",
+        to_agent="cto",
+        message_type="assignment",
+        phase="cto_breakdown",
+        summary="Break down the task",
+        artifact=".solo/artifacts/TASK-test/cto_breakdown_instruction.md",
+    )
 
     loaded = store.load_tasks()
     events = store.load_events()
+    messages = store.load_messages()
 
     assert loaded[0].id == "TASK-test"
     assert loaded[0].current_phase == "cto_breakdown"
     assert events[0]["event"] == "task.created"
+    assert messages[0]["from"] == "secretary"
+    assert messages[0]["to"] == "cto"
+    assert messages[0]["type"] == "assignment"
     assert json.loads((solo_dir / "state" / "tasks.json").read_text())["schema_version"] == 1
     assert (solo_dir / "state" / ".lock").exists()
 
