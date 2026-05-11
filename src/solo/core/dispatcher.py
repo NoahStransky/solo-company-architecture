@@ -197,9 +197,10 @@ class CommandDispatcher(ExecutionAdapter):
             package_result["runtime"] = {"skipped": "system phase"}
             return package_result
 
-        runtime = self.config.execution.command
+        role = package_result["agent_role"]
+        runtime, profile_name = self.config.get_command_runtime_for_role(role)
         if not runtime.command:
-            raise ValueError("execution.command.command is required for command adapter")
+            raise ValueError("execution.command.command or runtime profile command is required for command adapter")
 
         env = os.environ.copy()
         env.update(runtime.env)
@@ -239,6 +240,8 @@ class CommandDispatcher(ExecutionAdapter):
 
         result = dict(package_result)
         result["adapter"] = self.name
+        if profile_name:
+            result["runtime_profile"] = profile_name
         result["runtime"] = runtime_result
         result["runtime_report"] = str(runtime_path)
         return result
@@ -274,6 +277,8 @@ def phase_event_details(package: Dict[str, Any]) -> Dict[str, Any]:
         "adapter": package.get("adapter", ""),
         "agent_role": package.get("agent_role", ""),
     }
+    if package.get("runtime_profile"):
+        details["runtime_profile"] = package["runtime_profile"]
     for key in ("input", "instruction", "report", "runtime_report"):
         if package.get(key):
             details[key] = package[key]

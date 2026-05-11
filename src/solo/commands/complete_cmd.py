@@ -47,7 +47,8 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
         _set_instances_for_phase(task, next_phase.name, IN_PROGRESS)
         if next_phase.type in (AGENT, AGENT_POOL, SYSTEM):
             config = project.require_config()
-            dispatcher = build_dispatcher(config.execution.default_adapter, config, project.agents)
+            adapter = config.get_execution_adapter_for_role(next_phase.role or next_phase.name)
+            dispatcher = build_dispatcher(adapter, config, project.agents)
             package = dispatcher.prepare_phase(task, next_phase)
         project.state.append_event(
             "phase.started",
@@ -188,7 +189,10 @@ def complete(task_id: str, phase_name: str, as_json: bool):
     project = SoloProject.find(Path.cwd())
     if project is None:
         raise click.ClickException("No .solo project found. Run solo init first.")
-    result = complete_task(project, task_id=task_id, phase_name=phase_name)
+    try:
+        result = complete_task(project, task_id=task_id, phase_name=phase_name)
+    except (KeyError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
     if as_json:
         print_json(result)
         return

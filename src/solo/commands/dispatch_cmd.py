@@ -23,7 +23,6 @@ def dispatch_task(
 ) -> Dict[str, Any]:
     config = project.require_config()
     workflow_name = workflow_name or config.default_workflow
-    adapter = adapter or config.execution.default_adapter
 
     if role:
         workflow = Workflow(name=f"direct:{role}", description="Direct role dispatch", phases=[])
@@ -42,6 +41,7 @@ def dispatch_task(
     if phase is None:
         phase = TaskPhase(name=role or "secretary", type=AGENT, role=role or "secretary")
 
+    adapter = config.get_execution_adapter_for_role(phase.role or phase.name, override=adapter or "")
     dispatcher = build_dispatcher(adapter, config, project.agents)
     package = dispatcher.prepare_phase(task, phase)
 
@@ -85,7 +85,10 @@ def dispatch(role: str, workflow_name: str, adapter: str, as_json: bool, descrip
     if project is None:
         raise click.ClickException("No .solo project found. Run solo init first.")
     text = " ".join(description).strip()
-    result = dispatch_task(project, text, workflow_name=workflow_name, role=role, adapter=adapter)
+    try:
+        result = dispatch_task(project, text, workflow_name=workflow_name, role=role, adapter=adapter)
+    except (KeyError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
     if as_json:
         print_json(result)
         return

@@ -2,7 +2,7 @@
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
@@ -14,6 +14,7 @@ SOLO_PROTOCOL_VERSION = 1
 class AgentConfig:
     provider: str
     model: str
+    runtime: str = ""
     temperature: float = 0.3
     max_tokens: int = 32000
     skills: List[str] = field(default_factory=list)
@@ -25,6 +26,7 @@ class AgentConfig:
         return cls(
             provider=str(data.get("provider", "")),
             model=str(data.get("model", "")),
+            runtime=str(data.get("runtime", "")),
             temperature=float(data.get("temperature", 0.3)),
             max_tokens=int(data.get("max_tokens", 32000)),
             skills=list(data.get("skills", [])),
@@ -149,12 +151,29 @@ class CommandRuntimeConfig:
 @dataclass
 class ExecutionConfig:
     default_adapter: str = "package"
+    default_profile: str = ""
     command: CommandRuntimeConfig = field(default_factory=CommandRuntimeConfig)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExecutionConfig":
         return cls(
             default_adapter=str(data.get("default_adapter", "package")),
+            default_profile=str(data.get("default_profile", "")),
+            command=CommandRuntimeConfig.from_dict(data.get("command") or {}),
+        )
+
+
+@dataclass
+class RuntimeProfileConfig:
+    adapter: str = "command"
+    description: str = ""
+    command: CommandRuntimeConfig = field(default_factory=CommandRuntimeConfig)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "RuntimeProfileConfig":
+        return cls(
+            adapter=str(data.get("adapter", "command")),
+            description=str(data.get("description", "")),
             command=CommandRuntimeConfig.from_dict(data.get("command") or {}),
         )
 
@@ -166,6 +185,7 @@ class SoloConfig:
     providers: Dict[str, ProviderConfig] = field(default_factory=dict)
     mcp_servers: Dict[str, MCPServerConfig] = field(default_factory=dict)
     skills: Dict[str, SkillConfig] = field(default_factory=dict)
+    runtime_profiles: Dict[str, RuntimeProfileConfig] = field(default_factory=dict)
     delegation: DelegationConfig = field(default_factory=DelegationConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     default_workflow: str = "feature"
@@ -195,6 +215,10 @@ class SoloConfig:
                 name: SkillConfig.from_dict(value)
                 for name, value in (data.get("skills") or {}).items()
             },
+            runtime_profiles={
+                name: RuntimeProfileConfig.from_dict(value)
+                for name, value in (data.get("runtime_profiles") or {}).items()
+            },
             delegation=DelegationConfig.from_dict(data.get("delegation") or {}),
             execution=ExecutionConfig.from_dict(data.get("execution") or {}),
             default_workflow=str(data.get("default_workflow", "feature")),
@@ -208,6 +232,7 @@ class SoloConfig:
             "providers": {name: config.to_dict() for name, config in self.providers.items()},
             "mcp_servers": {name: asdict(config) for name, config in self.mcp_servers.items()},
             "skills": {name: asdict(config) for name, config in self.skills.items()},
+            "runtime_profiles": {name: asdict(config) for name, config in self.runtime_profiles.items()},
             "agents": {name: asdict(config) for name, config in self.agents.items()},
             "delegation": asdict(self.delegation),
             "execution": asdict(self.execution),
@@ -218,6 +243,36 @@ class SoloConfig:
         if role not in self.agents:
             raise KeyError(f"Unknown agent role: {role}")
         return self.agents[role]
+
+    def get_execution_adapter_for_role(self, role: str, override: str = "") -> str:
+        if override:
+            return override
+        profile = self.get_runtime_profile_for_role(role)
+        if profile:
+            return profile.adapter
+        return self.execution.default_adapter
+
+    def get_runtime_profile_for_role(self, role: str) -> Optional[RuntimeProfileConfig]:
+        profile_name = self.get_runtime_profile_name_for_role(role)
+        if not profile_name:
+            return None
+        if profile_name not in self.runtime_profiles:
+            raise KeyError(f"Unknown runtime profile for role {role}: {profile_name}")
+        return self.runtime_profiles[profile_name]
+
+    def get_runtime_profile_name_for_role(self, role: str) -> str:
+        agent = self.agents.get(role)
+        if agent and agent.runtime:
+            return agent.runtime
+        return self.execution.default_profile
+
+    def get_command_runtime_for_role(self, role: str) -> Tuple[CommandRuntimeConfig, str]:
+        profile_name = self.get_runtime_profile_name_for_role(role)
+        if profile_name:
+            profile = self.get_runtime_profile_for_role(role)
+            if profile and profile.command.command:
+                return profile.command, profile_name
+        return self.execution.command, ""
 
     def get_provider_for_agent(self, role: str) -> ProviderConfig:
         agent = self.get_agent(role)
