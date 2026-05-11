@@ -81,7 +81,7 @@ delegation:
   max_parallel_dev_agents: 3
 ```
 
-Agent communication uses a durable mailbox in `.solo/state/messages.jsonl`. Messages only store routing metadata and artifact pointers; large task briefs, instructions, runtime output, implementation reports, and QA reports stay in `.solo/artifacts/<task_id>/`.
+Agent communication uses a durable mailbox in `.solo/state/messages.jsonl`. Messages only store routing metadata and artifact pointers; large task briefs, instructions, runtime output, implementation reports, and QA reports stay in `.solo/artifacts/<task_id>/`. For handoffs, `artifact` points to an existing sender result when one exists, while `details.next_instruction` points to the next phase package. Agent pools are expanded to concrete recipients such as `dev-1` and `dev-2`.
 
 ## Agent Providers, MCP, And Skills
 

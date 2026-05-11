@@ -38,7 +38,7 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
             message_type="result",
             phase=phase.name,
             summary=f"{phase.name} completed for {task.title}",
-            artifact=str(Path(task.artifacts_dir) / f"{phase.name}_output.md"),
+            artifact=_phase_result_artifact(task, phase),
         )
     else:
         next_phase.status = IN_PROGRESS
@@ -55,16 +55,7 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
             phase=next_phase.name,
             details=phase_event_details(package) if package else None,
         )
-        project.state.append_message(
-            task.id,
-            from_agent=_phase_actor(phase),
-            to_agent=_phase_actor(next_phase),
-            message_type="handoff",
-            phase=next_phase.name,
-            summary=f"{phase.name} completed; {next_phase.name} is ready for {task.title}",
-            artifact=(package or {}).get("instruction", (package or {}).get("report", "")),
-            details=phase_event_details(package) if package else None,
-        )
+        _append_handoff_messages(project, task, phase, next_phase, package)
 
     task.touch()
     project.state.update_task(task)
@@ -126,10 +117,66 @@ def _ensure_instances_for_phase(task: Task, phase: TaskPhase) -> None:
             task.agent_instances.append(AgentInstance(id=instance_id, role=role, phase=phase.name, status=PENDING))
 
 
+def _append_handoff_messages(
+    project: SoloProject,
+    task: Task,
+    phase: TaskPhase,
+    next_phase: TaskPhase,
+    package: Optional[Dict[str, Any]],
+) -> None:
+    artifact = _phase_result_artifact(task, phase)
+    details = _handoff_details(package)
+    for sender in _phase_senders(phase):
+        for recipient in _phase_recipients(next_phase):
+            project.state.append_message(
+                task.id,
+                from_agent=sender,
+                to_agent=recipient,
+                message_type="handoff",
+                phase=next_phase.name,
+                summary=f"{phase.name} completed; {next_phase.name} is ready for {task.title}",
+                artifact=artifact,
+                details=details,
+            )
+
+
 def _phase_actor(phase: TaskPhase) -> str:
     if phase.type == HUMAN_GATE:
         return "ceo"
     return phase.role or phase.name
+
+
+def _phase_senders(phase: TaskPhase) -> list:
+    if phase.type == AGENT_POOL and phase.instance_ids:
+        return list(phase.instance_ids)
+    return [_phase_actor(phase)]
+
+
+def _phase_recipients(phase: TaskPhase) -> list:
+    if phase.type == AGENT_POOL and phase.instance_ids:
+        return list(phase.instance_ids)
+    return [_phase_actor(phase)]
+
+
+def _phase_result_artifact(task: Task, phase: TaskPhase) -> str:
+    artifact_dir = Path(task.artifacts_dir)
+    for candidate in (
+        artifact_dir / f"{phase.name}_output.md",
+        artifact_dir / f"{phase.name}.md",
+    ):
+        if candidate.exists():
+            return str(candidate)
+    return ""
+
+
+def _handoff_details(package: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not package:
+        return None
+    details = phase_event_details(package)
+    next_instruction = package.get("instruction") or package.get("report")
+    if next_instruction:
+        details["next_instruction"] = next_instruction
+    return details
 
 
 @click.command("complete")

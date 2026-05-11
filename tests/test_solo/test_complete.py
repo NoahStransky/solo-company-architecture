@@ -11,6 +11,9 @@ def test_complete_advances_to_dev_pool_after_cto_breakdown():
     with runner.isolated_filesystem():
         assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
         assert runner.invoke(main, ["dispatch", "Build backend API and frontend UI"]).exit_code == 0
+        task_id = json.loads(Path(".solo/state/tasks.json").read_text())["tasks"][0]["id"]
+        cto_output = Path(".solo/artifacts") / task_id / "cto_breakdown_output.md"
+        cto_output.write_text("CTO work packages", encoding="utf-8")
 
         result = runner.invoke(main, ["complete", "--json"])
 
@@ -27,12 +30,14 @@ def test_complete_advances_to_dev_pool_after_cto_breakdown():
             for line in Path(".solo/state/messages.jsonl").read_text().splitlines()
             if line.strip()
         ]
-        handoff = messages[-1]
-        assert handoff["type"] == "handoff"
-        assert handoff["from"] == "cto"
-        assert handoff["to"] == "dev"
-        assert handoff["phase"] == "dev_pool"
-        assert Path(handoff["artifact"]).exists()
+        handoffs = [message for message in messages if message["type"] == "handoff" and message["phase"] == "dev_pool"]
+        assert [message["to"] for message in handoffs] == ["dev-1", "dev-2"]
+        assert {message["from"] for message in handoffs} == {"cto"}
+        assert {message["artifact"] for message in handoffs} == {str(cto_output.resolve())}
+        assert all(Path(message["details"]["next_instruction"]).exists() for message in handoffs)
+
+        dev_output = Path(".solo/artifacts") / task_id / "dev_pool_output.md"
+        dev_output.write_text("Implemented backend and frontend", encoding="utf-8")
 
         result = runner.invoke(main, ["complete", "--json"])
 
@@ -45,11 +50,11 @@ def test_complete_advances_to_dev_pool_after_cto_breakdown():
             for line in Path(".solo/state/messages.jsonl").read_text().splitlines()
             if line.strip()
         ]
-        handoff = messages[-1]
-        assert handoff["type"] == "handoff"
-        assert handoff["from"] == "dev"
-        assert handoff["to"] == "qa"
-        assert handoff["phase"] == "qa"
+        handoffs = [message for message in messages if message["type"] == "handoff" and message["phase"] == "qa"]
+        assert [message["from"] for message in handoffs] == ["dev-1", "dev-2"]
+        assert {message["to"] for message in handoffs} == {"qa"}
+        assert {message["artifact"] for message in handoffs} == {str(dev_output.resolve())}
+        assert all(Path(message["details"]["next_instruction"]).exists() for message in handoffs)
 
 
 def test_complete_can_finish_direct_task():
@@ -73,3 +78,4 @@ def test_complete_can_finish_direct_task():
         assert messages[-1]["type"] == "result"
         assert messages[-1]["from"] == "cto"
         assert messages[-1]["to"] == "ceo"
+        assert "artifact" not in messages[-1]
