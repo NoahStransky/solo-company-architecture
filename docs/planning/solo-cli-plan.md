@@ -413,9 +413,10 @@ Adapter 建议：
 |---------|------|------|
 | `package` | MVP | 只生成执行包和指令文件 |
 | `manual` | MVP | 用户把结果放回 artifacts 后标记完成 |
-| `command` | 当前阶段 | 用通用命令适配器接 Hermes / Codex / Claude Code / 本地 wrapper |
-| `hermes` | 后续 | 如需要更深集成，再接 `delegate_task` |
-| `codex` / `claude-code` | 后续 | 如需要专用协议，再接外部 coding agent |
+| `command` | 当前阶段 | 用通用命令适配器接 Hermes / OpenClaw / Codex / Claude Code / 本地 wrapper |
+| `provider` | 后续可选 | 直接接模型 provider API |
+| `coding-cli` | 后续可选 | Codex / Claude Code 等 coding CLI 的更深封装 |
+| `orchestrator` | 后续可选 | Hermes / OpenClaw 等下层编排系统的更深封装 |
 
 ---
 
@@ -486,6 +487,15 @@ Adapter 建议：
 - result message 只在真实 output/report 存在时写 artifact，避免 dashboard 链接指向不存在的文件。
 - 当前验证：`docker compose run --rm test` 通过，`16 passed`。
 
+继续推进 runtime profile / setup：
+
+- 新增 `runtime_profiles` 协议，把外部 runtime 配置收敛为可复用 profile。
+- Agent 可通过 `agents.<role>.runtime` 选择 profile；没有设置时走 `execution.default_profile` / `execution.default_adapter`。
+- 新增 `solo setup runtime`，支持 preset、`--command`、`--arg`、`--env`、`--set-default`、`--for <role>`。
+- 当前内置 preset：`package`、`codex`、`claude-code`、`hermes`、`openclaw`。这些是 wrapper 起点，不把外部工具完整配置系统复制进 solo。
+- `solo status --json` 的 `execution` 增加 `default_profile` 和 runtime profile 列表，方便 `solo-os` 展示能力。
+- 当前验证：`docker compose run --rm test` 通过，`19 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -493,7 +503,7 @@ Adapter 建议：
 - runtime 结果已经落盘，并在事件流里保留 dashboard 友好的摘要。
 - `solo status --json` 已包含 solo-os 注册和 dashboard 所需的路径与执行能力。
 - Agent 之间的任务分派和交接已经通过 `messages.jsonl` 可追踪，并区分 sender result 和 next instruction。
-- Hermes/Codex/Claude Code 先通过 `command` adapter 接入；专用 runtime adapter 进入下一阶段，不阻塞当前闭环。
+- Hermes/OpenClaw/Codex/Claude Code 先通过 runtime profile + `command` adapter 接入；专用 adapter 不再是近期优先项。
 
 ### Progress Snapshot
 
@@ -504,11 +514,12 @@ Adapter 建议：
 | Step 3: workflow + dispatch | Done | workflow、agent registry、model router、package dispatcher、`solo dispatch` 已实现 |
 | Step 4: status | Done | `solo status` 和 `solo status --json` 已实现 |
 | Step 5: start 薄交互层 | Done | `solo start` 已复用 dispatch/status，暂不做真实 runtime |
-| Step 6: 执行适配器 | Done for generic runtime | `ExecutionAdapter` boundary、`package` adapter、`command` adapter、`solo complete` manual phase advance 已实现；Hermes/Codex 专用 adapter 是下一阶段 |
+| Step 6: 执行适配器 | Done for generic runtime | `ExecutionAdapter` boundary、`package` adapter、`command` adapter、`solo complete` manual phase advance 已实现；专用 adapter 后续可选 |
 | Docker 测试环境 | Done | `docker compose run --rm test` 可在容器内跑测试 |
 | Runtime 可观测性 | Done | command runtime 结果写入 artifacts，phase 事件记录 dashboard 可读摘要 |
 | solo-os 读取面 | Done | `solo status --json` 暴露 paths 和 execution capabilities |
 | Agent durable mailbox | Done | `.solo/state/messages.jsonl` 已接入 dispatch/complete/status；handoff artifact/next_instruction 和 agent pool 实例路由已修正 |
+| Runtime profiles / setup | Done | `runtime_profiles` 和 `solo setup runtime` 已实现，并通过容器测试 |
 
 当前新增能力：
 
@@ -608,7 +619,8 @@ solo start
 | `package` adapter | `src/solo/core/dispatcher.py` |
 | `manual complete` 命令或内部 API | `src/solo/commands/complete_cmd.py` |
 | `command` runtime adapter | `src/solo/core/dispatcher.py` |
-| Hermes / Codex 专用 adapter | 后续 |
+| runtime profiles | `src/solo/core/config.py`, `src/solo/commands/setup_cmd.py` |
+| provider / coding-cli / orchestrator adapter | 后续可选 |
 
 ---
 

@@ -73,6 +73,8 @@ skills:
     description: Investigate docs, APIs, competitors, and technical options.
     path: skills/research.md
 
+runtime_profiles: {}
+
 agents:
   secretary:
     provider: openai
@@ -161,6 +163,7 @@ delegation:
 
 execution:
   default_adapter: package
+  default_profile: ""
   command:
     command: ""
     args: []

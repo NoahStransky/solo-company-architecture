@@ -33,6 +33,7 @@ docker compose run --rm cli status --json
 ```bash
 solo init --yes
 solo dispatch --workflow feature "Build RSS subscriptions"
+solo setup runtime local-codex --preset codex --for dev --for qa
 solo dispatch --adapter command --json "Run with an external runtime"
 solo complete
 solo status
@@ -125,19 +126,36 @@ agents:
 
 The default `package` adapter writes execution packages into `.solo/artifacts/<task_id>/`.
 
-Use the generic `command` adapter when you want `solo` to hand the prepared package to an external runtime such as Hermes, Codex, Claude Code, or a local wrapper script:
+Use runtime profiles when you want agents to share reusable execution settings without copying every tool-specific option into each agent:
 
 ```yaml
 execution:
   default_adapter: package
-  command:
-    command: hermes
-    args: ["run", "--input", "{input}", "--instruction", "{instruction}"]
-    timeout: 300
-    env: {}
+  default_profile: ""
+
+runtime_profiles:
+  local-codex:
+    adapter: command
+    description: Local Codex CLI wrapper
+    command:
+      command: codex
+      args: ["{instruction}"]
+      timeout: 900
+      env: {}
+
+agents:
+  dev:
+    runtime: local-codex
 ```
 
-`command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
+Create or update profiles from the CLI:
+
+```bash
+solo setup runtime local-codex --preset codex --for dev --for qa
+solo setup runtime local-wrapper --command ./scripts/solo-runtime --arg "{instruction}" --set-default
+```
+
+The generic `command` adapter can hand the prepared package to Hermes, OpenClaw, Codex, Claude Code, or a local wrapper script. `command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
 
 Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runtime.json`; `events.jsonl` stores a lightweight pointer and return code for dashboards.
 
@@ -149,6 +167,7 @@ solo dispatch
 solo complete
 solo status
 solo start
+solo setup runtime
 ```
 
 The protocol-first dispatcher can either generate packages for manual completion or run a configured external command adapter.

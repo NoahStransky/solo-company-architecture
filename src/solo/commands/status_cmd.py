@@ -30,7 +30,9 @@ def build_status(project: SoloProject, include_all: bool = False) -> Dict[str, A
         },
         "execution": {
             "default_adapter": config.execution.default_adapter,
+            "default_profile": config.execution.default_profile,
             "available_adapters": available_adapters(),
+            "runtime_profiles": sorted(config.runtime_profiles.keys()),
         },
         "summary": {
             "total_tasks": len(tasks),
