@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
+import sys
 
 from click.testing import CliRunner
+import yaml
 
 from solo.cli import main
 
@@ -290,3 +292,46 @@ def test_complete_uses_explicit_work_package_statuses_from_agent_result():
         payload = json.loads(result.output)
         assert [item["id"] for item in payload["task"]["work_packages"]] == ["api", "ui", "tests"]
         assert [item["status"] for item in payload["task"]["work_packages"]] == ["completed", "completed", "blocked"]
+
+
+def test_command_adapter_runs_agent_pool_per_instance():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        assert runner.invoke(main, ["dispatch", "Build backend API and frontend UI"]).exit_code == 0
+        config_path = Path(".solo/config.yaml")
+        config = yaml.safe_load(config_path.read_text())
+        config["execution"]["default_adapter"] = "command"
+        config["execution"]["command"] = {
+            "command": sys.executable,
+            "args": [
+                "-c",
+                (
+                    "import os, pathlib; "
+                    "out = pathlib.Path(os.environ['SOLO_OUTPUT_DIR']); "
+                    "inst = os.environ['SOLO_AGENT_INSTANCE']; "
+                    "input_name = pathlib.Path(os.environ['SOLO_PACKAGE_INPUT']).name; "
+                    "instruction_name = pathlib.Path(os.environ['SOLO_PACKAGE_INSTRUCTION']).name; "
+                    "(out / (inst + '_seen.txt')).write_text(input_name + '|' + instruction_name)"
+                ),
+            ],
+            "timeout": 30,
+            "env": {},
+        }
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        task_id = json.loads(Path(".solo/state/tasks.json").read_text())["tasks"][0]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "cto_breakdown_output.md").write_text("CTO work packages", encoding="utf-8")
+
+        result = runner.invoke(main, ["complete", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        package = payload["package"]
+        assert package["adapter"] == "command"
+        assert package["runtime"]["agent_count"] == 2
+        assert set(package["agent_runtimes"]) == {"dev-1", "dev-2"}
+        assert Path(package["agent_runtimes"]["dev-1"]["runtime_report"]).exists()
+        assert Path(package["runtime_report"]).exists()
+        assert (artifact_dir / "dev-1_seen.txt").read_text() == "dev-1_input.json|dev-1_instruction.md"
+        assert (artifact_dir / "dev-2_seen.txt").read_text() == "dev-2_input.json|dev-2_instruction.md"

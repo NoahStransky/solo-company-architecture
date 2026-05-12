@@ -545,6 +545,13 @@ Adapter 建议：
 - 不引入新依赖，先做协议必填字段和 QA verdict 枚举的轻量验证。
 - 当前验证：`docker compose run --rm test` 通过，`32 passed`。
 
+继续推进 command adapter agent pool runtime：
+
+- `command` adapter 在 agent pool phase 会按 agent instance 逐个调用 runtime。
+- 每个 runtime 调用会收到 `SOLO_AGENT_INSTANCE`，以及实例级 `SOLO_PACKAGE_INPUT` / `SOLO_PACKAGE_INSTRUCTION`。
+- 新增 `{agent_instance}` command arg placeholder；runtime report 会写入 `dev-1_runtime.json` 等 per-agent 文件，并保留 phase aggregate runtime report。
+- 当前验证：`docker compose run --rm test` 通过，`33 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -560,6 +567,7 @@ Adapter 建议：
 - Agent pool 已生成 per-instance execution package，mailbox 可以把 `dev-1/dev-2/...` 路由到各自 instruction。
 - Dev agent result 已能更新对应 work package status。
 - `solo validate` 已覆盖结构化 artifacts 的轻量 contract validation。
+- `command` adapter 已能按 agent pool instance 分别运行外部 runtime。
 
 ### Progress Snapshot
 
@@ -583,6 +591,7 @@ Adapter 建议：
 | Agent pool per-instance packages | Done | dev pool 会生成每个 agent instance 的 input/instruction，并写入 mailbox handoff |
 | Work package status feedback | Done | dev result 会回填对应 work package status，并记录更新事件 |
 | Artifact contract validation | Done | `solo validate` 会检查 work packages、agent result、QA report 等 artifact |
+| Command adapter agent pool runtime | Done | command runtime 会按 agent instance 分别执行，并写 per-agent runtime report |
 
 当前新增能力：
 
