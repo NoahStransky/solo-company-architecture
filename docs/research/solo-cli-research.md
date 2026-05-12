@@ -95,42 +95,72 @@ Settings 包含:
 > **每个项目就是一家公司，.solo/ 就是这家公司的组织架构和运营系统。**
 > 不依赖 solo-os 也能完整运行。
 
-### 2.2 CLI 命令设计
+### 2.2 设计边界
+
+`solo` 是 **单项目运行层**，负责一个 repo 内部的 Agent 组织、任务状态、执行包、工作流和模型路由。
+
+`solo-os` 是另一个独立项目里的 **多项目控制层**，负责注册多个已初始化的 `.solo/` 项目、聚合状态、跨项目调度和 Dashboard。当前 `solo` 项目不内置多项目 Dashboard，也不承担全局项目注册。
+
+因此 `solo` 的首要交付物不是花哨的 TUI，而是稳定的 `.solo/` 文件协议：
+
+```
+.solo/
+├── config.yaml               # 项目元信息、Agent 模型配置、默认 workflow
+├── agents/                   # 角色 prompt
+├── workflows/                # feature / bugfix / release 等 SOP
+├── state/
+│   ├── tasks.json            # 当前任务快照，供 solo status 和 solo-os 读取
+│   ├── events.jsonl          # 追加式事件日志，供 Dashboard/审计读取
+│   └── sessions/             # 未来交互式会话记录
+├── artifacts/                # 每个任务的阶段产物
+└── contracts/                # 可选：跨项目接口契约，主要供 solo-os 使用
+```
+
+核心原则：
+
+- `solo` 可以被单独安装和使用。
+- `.solo/` 是 `solo-os` 读取项目状态的稳定协议。
+- `solo-os` 不应 import `solo` 内部 Python 类；优先通过文件协议和 `solo ... --json` 命令交互。
+- 当前项目不实现 Web Dashboard；Dashboard 属于独立的 `solo-os` 项目。
+
+### 2.3 CLI 命令设计
 
 ```
 solo
 ├── init                          # 初始化 .solo/ 目录
 │   ├── (默认交互式问答)
-│   ├── --template <name>         # 从模板初始化（react, py, ts...）
+│   ├── --template <name>         # 后续：从模板初始化（react, py, ts...）
 │   └── --yes                     # 全默认快速初始化
-│
-├── start                         # 进入交互式 CLI
-│   ├── (默认模式) CEO ↔ Secretary
-│   ├── --os                      # 进入 OS 模式（管理多项目）
-│   └── --json                    # 一次性任务模式
 │
 ├── status                        # 查看当前项目任务状态
 │   ├── (默认) 最近任务摘要
-│   └── --all                     # 所有历史任务
-│
-├── list                          # 扫描所有含 .solo/ 的项目
-│
-├── config                        # 查看/修改 .solo/ 配置
-│   ├── get <key>
-│   ├── set <key> <value>
-│   └── edit                      # 打开编辑器
+│   ├── --all                     # 所有历史任务
+│   └── --json                    # 给 solo-os / 其他工具消费
 │
 ├── dispatch                      # 直接派任务（无需交互模式）
-│   └── solo dispatch --to cto "审查这个PR"
+│   ├── solo dispatch --to cto "审查这个PR"
+│   ├── --workflow feature        # 按 SOP 创建任务
+│   └── --json                    # 输出结构化结果
 │
-├── project                       # 操作关联项目
-│   └── solo project add <path>   # 添加关联项目
+├── start                         # 进入单项目交互式 CLI（薄壳，复用 dispatch/status）
+│   └── (默认模式) CEO ↔ Secretary
+│
+├── config                        # 后续：查看/修改 .solo/ 配置
+│   ├── get <key>
+│   ├── set <key> <value>
+│   └── edit
 │
 ├── version / -v
 └── help / -h
 ```
 
-### 2.3 目录结构
+不放进 `solo` 的命令：
+
+- `solo list` / `solo project add`：属于 `solo-os` 的项目注册与扫描。
+- `solo start --os`：属于独立 `solo-os start`。
+- Web Dashboard：属于独立 `solo-os dashboard`。
+
+### 2.4 目录结构
 
 ```
 my-project/
@@ -146,21 +176,29 @@ my-project/
 │   │   └── analyst.md
 │   ├── state/                    # 状态持久化
 │   │   ├── tasks.json
+│   │   ├── events.jsonl
 │   │   └── sessions/
+│   ├── artifacts/                # 任务阶段产物
+│   │   └── TASK-20260508-001/
+│   │       ├── cpo.md
+│   │       ├── cto.md
+│   │       ├── dev.md
+│   │       ├── qa.md
+│   │       └── report.md
 │   ├── workflows/                # 自定义 SOP
 │   │   ├── bugfix.md
 │   │   ├── feature.md
 │   │   └── release.md
 │   ├── prompts/                  # Prompt 模板（类似 pi 的 /template）
+│   ├── contracts/                # 可选：跨项目契约，供 solo-os 使用
 │   └── hooks/                    # Git hooks / 生命周期钩子
 │       ├── pre-commit
 │       └── post-merge
 │
-├── .soloignore                   # 可选：排除文件
-└── solo                          # CLI 入口 shell 脚本
+└── .soloignore                   # 可选：排除文件
 ```
 
-### 2.4 配置设计
+### 2.5 配置设计
 
 ```yaml
 # .solo/config.yaml
@@ -221,15 +259,49 @@ default_workflow:
   - merge     # Phase 6: 合并发布
   - growth    # Phase 7: 增长（可与Dev并行，但在此列出以确认顺序）
 
-# 项目关联（供 solo-os 使用）
-related_projects:
-  - path: ../auth-service
-    name: auth-service
-  - path: ../api-gateway
-    name: api-gateway
+# 协议版本：给 future migration 和 solo-os 兼容性检测使用
+solo_protocol_version: 1
 ```
 
-### 2.5 交互式 CLI 模式 (solo start)
+`related_projects` 不放进单项目 `solo` 的核心配置。跨项目注册由独立的 `solo-os` 在 `~/.solo-os/projects.yaml` 维护。
+
+### 2.6 状态协议
+
+`solo status --json` 和 `solo-os dashboard` 都应该从 `.solo/state/tasks.json` 与 `.solo/state/events.jsonl` 读取状态。
+
+建议任务快照结构：
+
+```json
+{
+  "tasks": [
+    {
+      "id": "TASK-20260508-001",
+      "title": "RSS 订阅功能",
+      "status": "in_progress",
+      "workflow": "feature",
+      "current_phase": "dev",
+      "phases": [
+        {"name": "cto", "status": "completed"},
+        {"name": "dev", "status": "in_progress"},
+        {"name": "qa", "status": "pending"}
+      ],
+      "created_at": "2026-05-08T10:00:00+10:00",
+      "updated_at": "2026-05-08T10:42:00+10:00"
+    }
+  ]
+}
+```
+
+事件日志采用追加式 JSONL，避免并发写入时覆盖完整状态：
+
+```jsonl
+{"ts":"2026-05-08T10:00:00+10:00","task_id":"TASK-20260508-001","event":"task.created","phase":"secretary"}
+{"ts":"2026-05-08T10:10:00+10:00","task_id":"TASK-20260508-001","event":"phase.started","phase":"dev"}
+```
+
+### 2.7 交互式 CLI 模式 (solo start)
+
+`solo start` 是单项目交互入口。第一版应做成 `dispatch/status` 的薄壳，而不是重新实现一套完整运行时。
 
 借鉴 pi 的 TUI + Hermes 的会话模式：
 
@@ -260,7 +332,7 @@ $ solo start
   秘书 > 调度 CTO 做架构设计...
 ```
 
-### 2.6 与 pi 的关键区别
+### 2.8 与 pi 的关键区别
 
 | 对比维度 | pi | solo |
 |---------|----|------|
@@ -268,14 +340,14 @@ $ solo start
 | **工作流** | 对话式编码 | **SOP 驱动**: PRD → 架构 → 开发 → QA → 增长 |
 | **模型策略** | 手动 /provider 切换 | **按角色自动路由**（CTO 最强，QA 最便宜） |
 | **状态** | 单会话 | 任务状态持久化，可追踪多任务并行 |
-| **多项目** | 无原生支持 | `related_projects` + solo-os 跨项目编排 |
+| **多项目** | 无原生支持 | 不在 solo 内实现；交给独立 `solo-os` |
 | **部署** | npm 全局包 | pip install，项目级 `solo` 入口脚本也可独立分发 |
 
-### 2.7 借鉴 pi 的设计
+### 2.9 借鉴 pi 的设计
 
 | pi 的好设计 | solo 如何借鉴 |
 |-----------|--------------|
-| 三层配置（global + user + project） | `~/.solo/` 全局 + 项目 `.solo/` 局部覆盖 |
+| 三层配置（global + user + project） | 后续可支持 `~/.solo/` 全局 + 项目 `.solo/` 局部覆盖；MVP 先以项目 `.solo/` 为准 |
 | Skills 系统（可插拔 prompt） | `agents/*.md` 是内置 Skills，Projects 可自定义 |
 | Prompt Templates（/command） | `prompts/` 目录，如 `/pr-review`, `/bugfix` |
 | Extensions 系统 | 未来支持 Python 插件（自定义工具、事件监听） |
@@ -289,7 +361,7 @@ $ solo start
 
 ### 3.1 技术选型
 
-- **语言**: Python（与现有 `agent_orchestrator.py`、`model_router.py` 一致）
+- **语言**: Python（适合快速实现 CLI、文件协议和本地编排）
 - **CLI 框架**: [Click](https://click.palletsprojects.com/)（命令分组 + 参数解析）或 [Typer](https://typer.tiangolo.com/)（更现代）
 - **终端 UI**: [Rich](https://rich.readthedocs.io/)（markdown 渲染、面板、进度条）
 - **交互式循环**: [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/)（历史、自动补全、多行输入）
@@ -308,17 +380,19 @@ solo-company-cli/
 │   │   ├── cli.py                # Click/Typer 命令分组
 │   │   ├── commands/
 │   │   │   ├── init.py           # solo init
-│   │   │   ├── start.py          # solo start（交互模式）
 │   │   │   ├── status.py         # solo status
-│   │   │   ├── list.py           # solo list
+│   │   │   ├── dispatch.py       # solo dispatch
+│   │   │   ├── start.py          # solo start（交互模式）
 │   │   │   ├── config.py         # solo config
-│   │   │   └── dispatch.py       # solo dispatch
 │   │   ├── core/
 │   │   │   ├── project.py        # Project 类：.solo/ 加载/保存
 │   │   │   ├── config.py         # Config 加载/验证/合并
-│   │   │   ├── secretary.py      # Secretary Agent 逻辑
-│   │   │   ├── model_router.py   # 模型路由（复用现有）
-│   │   │   └── state.py          # 任务状态持久化
+│   │   │   ├── state.py          # 任务状态持久化 + events.jsonl
+│   │   │   ├── workflow.py       # SOP 加载/阶段定义
+│   │   │   ├── agent_registry.py # Agent prompt 注册
+│   │   │   ├── secretary.py      # Secretary 任务生命周期
+│   │   │   ├── dispatcher.py     # 执行包/外部 runtime 适配
+│   │   │   ├── model_router.py   # 模型路由
 │   │   ├── templates/            # init 模板
 │   │   │   ├── default/
 │   │   │   ├── react/
@@ -333,12 +407,13 @@ solo-company-cli/
 | 阶段 | 功能 | 优先级 |
 |------|------|--------|
 | **P0** | `solo init` → 生成 `.solo/config.yaml` + agent prompts | 🚀 MVP |
-| **P0** | `solo start` → 简单的交互模式，对接现有 Secretary + Model Router | 🚀 MVP |
-| **P1** | `solo status` → 任务状态查看 | ⭐ |
-| **P1** | 完善交互模式：Rich UI、markdown 渲染、命令历史 | ⭐ |
-| **P2** | `solo list` → 扫描多项目 | ✅ |
+| **P0** | `.solo/state/tasks.json` + `events.jsonl` 状态协议 | 🚀 MVP |
+| **P0** | `solo dispatch` → 创建任务、生成 Agent 执行包、推进状态 | 🚀 MVP |
+| **P0** | `solo status --json` → 给本项目和未来 solo-os 消费 | 🚀 MVP |
+| **P1** | `solo start` → 简单交互壳，复用 dispatch/status | ⭐ |
+| **P1** | 外部执行适配器（Hermes/Codex/Claude Code） | ⭐ |
 | **P2** | `solo config` → 配置管理 | ✅ |
-| **P3** | Templates 系统（`solo init --template`） | 🌟 |
+| **P2** | 内置模板扩展（`solo init --template`） | ✅ |
 | **P3** | Prompt Templates（类似 pi 的 `/command`） | 🌟 |
 | **P4** | Extensions 插件系统 | 🔮 |
 | **P4** | PyPI 发布 + 自动更新 | 🔮 |
@@ -347,7 +422,8 @@ solo-company-cli/
 
 ## 四、风险和注意事项
 
-1. **`delegate_task` 300s 超时问题** — solo CLI 内部会大量使用 delegate_task（每个 Agent 角色都是独立子任务）。需要实现超时检测 + 幽灵完成检查 + 自动重试。
-2. **solo-os 依赖发现问题** — solo 的 `related_projects` 配置是 solo-os 调度的基础，但 solo 本身不依赖 solo-os。
-3. **config 与 pi 的兼容性** — 用户可能同时用 pi 和 solo，注意避免 `.pi/` 和 `.solo/` 配置冲突（使用不同目录名即可避免）。
-4. **多 provider API key 管理** — 类似 pi 的 `auth.json`，solo 需要安全存储不同 provider 的 API keys。
+1. **执行层不确定** — MVP 应先把 `dispatch` 定义为“生成执行包 + 状态流转”，把 Hermes/Codex/Claude Code 作为可插拔执行适配器。
+2. **状态协议稳定性** — `solo-os` 未来会读取 `.solo/state/tasks.json` 和 `events.jsonl`。字段命名、状态枚举、协议版本要从第一版就控制住。
+3. **并发写入** — `solo start`、`solo dispatch`、未来 `solo-os dispatch` 可能同时改状态。需要文件锁或事件日志优先的合并策略。
+4. **config 与 pi 的兼容性** — 用户可能同时用 pi 和 solo，注意避免 `.pi/` 和 `.solo/` 配置冲突（使用不同目录名即可避免）。
+5. **多 provider API key 管理** — 类似 pi 的 `auth.json`，solo 需要安全存储不同 provider 的 API keys；MVP 可以先只读环境变量。

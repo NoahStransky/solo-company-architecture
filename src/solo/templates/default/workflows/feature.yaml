@@ -1,0 +1,31 @@
+name: feature
+description: CEO request to CTO breakdown, dev pool, QA, CTO review, report.
+phases:
+  - name: cto_breakdown
+    type: agent
+    role: cto
+  - name: ceo_check
+    type: human_gate
+    optional: true
+    depends_on:
+      - cto_breakdown
+  - name: dev_pool
+    type: agent_pool
+    role: dev
+    depends_on:
+      - cto_breakdown
+  - name: qa
+    type: agent
+    role: qa
+    depends_on:
+      - dev_pool
+  - name: cto_review
+    type: agent
+    role: cto
+    depends_on:
+      - qa
+  - name: secretary_report
+    type: system
+    role: secretary
+    depends_on:
+      - cto_review

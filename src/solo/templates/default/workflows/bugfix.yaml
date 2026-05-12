@@ -1,0 +1,21 @@
+name: bugfix
+description: Triage, fix, verify, and report.
+phases:
+  - name: cto_triage
+    type: agent
+    role: cto
+  - name: dev_pool
+    type: agent_pool
+    role: dev
+    depends_on:
+      - cto_triage
+  - name: qa
+    type: agent
+    role: qa
+    depends_on:
+      - dev_pool
+  - name: secretary_report
+    type: system
+    role: secretary
+    depends_on:
+      - qa
