@@ -50,3 +50,41 @@ def test_validate_reports_invalid_jsonl():
         assert result.exit_code == 1, result.output
         payload = json.loads(result.output)
         assert payload["errors"][0]["code"] == "invalid_message_log"
+
+
+def test_validate_reports_invalid_work_package_artifact():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build artifact validation"])
+        task_id = json.loads(dispatch.output)["task"]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "work_packages.json").write_text(
+            json.dumps({"work_packages": [{"id": "api", "title": "Build API"}]}),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["validate", "--json"])
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert any(issue["code"] == "invalid_work_packages" for issue in payload["errors"])
+
+
+def test_validate_reports_invalid_qa_report_artifact():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build qa validation"])
+        task_id = json.loads(dispatch.output)["task"]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "qa_report.json").write_text(
+            json.dumps({"summary": "Tests looked fine", "verdict": "maybe"}),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["validate", "--json"])
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert any(issue["code"] == "invalid_qa_report" for issue in payload["errors"])

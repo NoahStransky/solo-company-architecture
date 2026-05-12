@@ -175,7 +175,7 @@ Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runt
 
 ## Protocol Validation
 
-Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, and JSON/JSONL state files.
+Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, JSON/JSONL state files, and structured artifact contracts.
 
 ```bash
 solo validate

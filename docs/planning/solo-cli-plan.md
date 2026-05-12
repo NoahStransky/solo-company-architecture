@@ -539,6 +539,12 @@ Adapter 建议：
 - `work_packages.updated` 事件会记录 dev pool 阶段的状态回流，方便 dashboard 展示每个 work package 的进度。
 - 当前验证：`docker compose run --rm test` 通过，`30 passed`。
 
+继续推进 artifact contract validation：
+
+- `solo validate` 会检查 `work_packages.json`、`*_agent_result.json` / `*_result.json`、`qa_report.json` 等结构化 artifact。
+- 不引入新依赖，先做协议必填字段和 QA verdict 枚举的轻量验证。
+- 当前验证：`docker compose run --rm test` 通过，`32 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -553,6 +559,7 @@ Adapter 建议：
 - `solo inspect --json` 已提供单任务详情读取面，方便 dashboard 避免自行扫描和拼接上下文。
 - Agent pool 已生成 per-instance execution package，mailbox 可以把 `dev-1/dev-2/...` 路由到各自 instruction。
 - Dev agent result 已能更新对应 work package status。
+- `solo validate` 已覆盖结构化 artifacts 的轻量 contract validation。
 
 ### Progress Snapshot
 
@@ -575,6 +582,7 @@ Adapter 建议：
 | Task inspect API | Done | `solo inspect --json` 输出 task、events、messages 和 artifact manifest |
 | Agent pool per-instance packages | Done | dev pool 会生成每个 agent instance 的 input/instruction，并写入 mailbox handoff |
 | Work package status feedback | Done | dev result 会回填对应 work package status，并记录更新事件 |
+| Artifact contract validation | Done | `solo validate` 会检查 work packages、agent result、QA report 等 artifact |
 
 当前新增能力：
 
