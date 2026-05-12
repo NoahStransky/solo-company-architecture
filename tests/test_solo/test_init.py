@@ -19,6 +19,10 @@ def test_init_creates_solo_protocol_files():
         assert Path(".solo/state/tasks.json").exists()
         assert Path(".solo/state/events.jsonl").exists()
         assert Path(".solo/state/messages.jsonl").exists()
+        assert Path(".solo/contracts/work_packages.schema.json").exists()
+        assert Path(".solo/contracts/agent_result.schema.json").exists()
+        assert Path(".solo/contracts/qa_report.schema.json").exists()
+        assert Path(".solo/contracts/message.schema.json").exists()
         assert Path(".solo/artifacts").is_dir()
         assert Path(".soloignore").exists()
 

@@ -29,7 +29,7 @@ solo = "solo.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-solo = ["templates/default/**/*.md", "templates/default/**/*.yaml", "templates/default/.soloignore"]
+solo = ["templates/default/**/*.md", "templates/default/**/*.yaml", "templates/default/**/*.json", "templates/default/.soloignore"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]

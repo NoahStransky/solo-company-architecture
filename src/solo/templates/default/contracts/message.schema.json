@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Solo Mailbox Message",
+  "type": "object",
+  "required": ["ts", "task_id", "from", "to", "type"],
+  "properties": {
+    "ts": {"type": "string"},
+    "task_id": {"type": "string"},
+    "from": {"type": "string"},
+    "to": {"type": "string"},
+    "type": {"type": "string"},
+    "phase": {"type": "string"},
+    "summary": {"type": "string"},
+    "artifact": {"type": "string"},
+    "details": {"type": "object"}
+  },
+  "additionalProperties": true
+}

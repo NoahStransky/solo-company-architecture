@@ -1,5 +1,6 @@
 """solo complete command."""
 
+import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -7,7 +8,7 @@ import click
 
 from solo.core.dispatcher import build_dispatcher, phase_event_details
 from solo.core.project import SoloProject
-from solo.core.task import AGENT, AGENT_POOL, COMPLETED, HUMAN_GATE, IN_PROGRESS, PENDING, SKIPPED, SYSTEM, AgentInstance, Task, TaskPhase
+from solo.core.task import AGENT, AGENT_POOL, COMPLETED, HUMAN_GATE, IN_PROGRESS, PENDING, SKIPPED, SYSTEM, AgentInstance, Task, TaskPhase, WorkPackage
 from solo.utils.ui import print_json, success
 
 
@@ -23,6 +24,16 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
 
     phase.status = COMPLETED
     _set_instances_for_phase(task, phase.name, COMPLETED)
+    loaded_work_packages = _load_phase_work_packages(task, phase)
+    if loaded_work_packages:
+        task.work_packages = loaded_work_packages
+        _assign_work_packages(task)
+        project.state.append_event(
+            "work_packages.updated",
+            task.id,
+            phase=phase.name,
+            details={"count": len(task.work_packages)},
+        )
     project.state.append_event("phase.completed", task.id, phase=phase.name)
 
     next_phase = _next_runnable_phase(task)
@@ -116,6 +127,63 @@ def _ensure_instances_for_phase(task: Task, phase: TaskPhase) -> None:
         role = phase.role or phase.name
         for instance_id in phase.instance_ids:
             task.agent_instances.append(AgentInstance(id=instance_id, role=role, phase=phase.name, status=PENDING))
+
+
+def _load_phase_work_packages(task: Task, phase: TaskPhase) -> list:
+    if phase.name != "cto_breakdown":
+        return []
+    artifact_dir = Path(task.artifacts_dir)
+    for path in (artifact_dir / "work_packages.json", artifact_dir / f"{phase.name}_output.json"):
+        if not path.exists():
+            continue
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            items = data.get("work_packages", [])
+        else:
+            raise ValueError(f"Invalid work package payload: {path}")
+        if not isinstance(items, list):
+            raise ValueError(f"Invalid work package payload: {path}")
+        return [_work_package_from_payload(item, index) for index, item in enumerate(items)]
+    return []
+
+
+def _work_package_from_payload(data: Dict[str, Any], index: int) -> WorkPackage:
+    if not isinstance(data, dict):
+        raise ValueError("Each work package must be an object")
+    title = str(data.get("title", "")).strip()
+    description = str(data.get("description", "")).strip()
+    if not title or not description:
+        raise ValueError("Each work package requires title and description")
+    return WorkPackage(
+        id=str(data.get("id") or f"wp-{index + 1}"),
+        title=title,
+        description=description,
+        agent_role=str(data.get("agent_role", "dev")),
+        files_scope=[str(item) for item in data.get("files_scope", [])],
+        depends_on=[str(item) for item in data.get("depends_on", [])],
+        agent_instance=str(data["agent_instance"]) if data.get("agent_instance") else None,
+    )
+
+
+def _assign_work_packages(task: Task) -> None:
+    dev_instances = [
+        instance
+        for instance in task.agent_instances
+        if instance.role == "dev" and instance.phase == "dev_pool"
+    ]
+    if not dev_instances:
+        return
+    for index, package in enumerate(task.work_packages):
+        if package.agent_role != "dev":
+            continue
+        assigned = package.agent_instance or dev_instances[index % len(dev_instances)].id
+        package.agent_instance = assigned
+        for instance in dev_instances:
+            if instance.id == assigned and not instance.work_package_id:
+                instance.work_package_id = package.id
 
 
 def _append_handoff_messages(

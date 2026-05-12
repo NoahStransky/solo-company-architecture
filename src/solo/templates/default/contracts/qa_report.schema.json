@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Solo QA Report",
+  "type": "object",
+  "required": ["summary", "verdict"],
+  "properties": {
+    "summary": {"type": "string"},
+    "verdict": {"type": "string", "enum": ["pass", "fail", "blocked", "needs_review"]},
+    "tests_run": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "string"}},
+    "risks": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

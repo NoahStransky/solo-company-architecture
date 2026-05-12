@@ -496,6 +496,16 @@ Adapter 建议：
 - `solo status --json` 的 `execution` 增加 `default_profile` 和 runtime profile 列表，方便 `solo-os` 展示能力。
 - 当前验证：`docker compose run --rm test` 通过，`19 passed`。
 
+#### 2026-05-12
+
+继续推进结构化产物 / contracts：
+
+- 新增 `.solo/contracts/work_packages.schema.json`、`agent_result.schema.json`、`qa_report.schema.json`、`message.schema.json`，给 runtime wrapper 和 `solo-os` 一个稳定读取面。
+- `solo complete` 在完成 `cto_breakdown` 时，会读取 `.solo/artifacts/<task_id>/work_packages.json` 或 `cto_breakdown_output.json`。
+- 结构化 work packages 会写回 `task.work_packages`，并按 dev pool 实例分配到 `dev-1/dev-2/...`。
+- 下一阶段 dev package 会包含更新后的 `work_packages` 和 `agent_instances`。
+- 当前验证：`docker compose run --rm test` 通过，`21 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -504,6 +514,7 @@ Adapter 建议：
 - `solo status --json` 已包含 solo-os 注册和 dashboard 所需的路径与执行能力。
 - Agent 之间的任务分派和交接已经通过 `messages.jsonl` 可追踪，并区分 sender result 和 next instruction。
 - Hermes/OpenClaw/Codex/Claude Code 先通过 runtime profile + `command` adapter 接入；专用 adapter 不再是近期优先项。
+- CTO -> Dev 的 work package 已从约定文件升级为结构化 task state。
 
 ### Progress Snapshot
 
@@ -520,6 +531,7 @@ Adapter 建议：
 | solo-os 读取面 | Done | `solo status --json` 暴露 paths 和 execution capabilities |
 | Agent durable mailbox | Done | `.solo/state/messages.jsonl` 已接入 dispatch/complete/status；handoff artifact/next_instruction 和 agent pool 实例路由已修正 |
 | Runtime profiles / setup | Done | `runtime_profiles` 和 `solo setup runtime` 已实现，并通过容器测试 |
+| Structured contracts / work packages | Done | contracts schema 和 CTO work package ingestion 已实现，并通过容器测试 |
 
 当前新增能力：
 
