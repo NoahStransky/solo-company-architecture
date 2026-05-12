@@ -87,6 +87,7 @@ class PackageDispatcher(ExecutionAdapter):
             "planned_dev_agents": task.planned_dev_agents,
             "agent_instances": [instance.to_dict() for instance in task.agent_instances],
             "work_packages": [package.to_dict() for package in task.work_packages],
+            "phase_results": [result.to_dict() for result in task.phase_results],
             "output_dir": str(artifact_dir),
         }
 
@@ -109,6 +110,7 @@ class PackageDispatcher(ExecutionAdapter):
             "planned_dev_agents": task.planned_dev_agents,
             "agent_instances": [instance.to_dict() for instance in task.agent_instances],
             "work_packages": [package.to_dict() for package in task.work_packages],
+            "phase_results": [result.to_dict() for result in task.phase_results],
             "input": str(input_path),
             "instruction": str(instruction_path),
             "task": str(task_path),

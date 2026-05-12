@@ -8,7 +8,7 @@ import click
 
 from solo.core.dispatcher import build_dispatcher, phase_event_details
 from solo.core.project import SoloProject
-from solo.core.task import AGENT, AGENT_POOL, COMPLETED, HUMAN_GATE, IN_PROGRESS, PENDING, SKIPPED, SYSTEM, AgentInstance, Task, TaskPhase, WorkPackage
+from solo.core.task import AGENT, AGENT_POOL, COMPLETED, HUMAN_GATE, IN_PROGRESS, PENDING, SKIPPED, SYSTEM, AgentInstance, PhaseResult, Task, TaskPhase, WorkPackage
 from solo.utils.ui import print_json, success
 
 
@@ -33,6 +33,15 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
             task.id,
             phase=phase.name,
             details={"count": len(task.work_packages)},
+        )
+    loaded_phase_results = _load_phase_results(task, phase)
+    if loaded_phase_results:
+        _upsert_phase_results(task, loaded_phase_results)
+        project.state.append_event(
+            "phase_results.updated",
+            task.id,
+            phase=phase.name,
+            details={"count": len(loaded_phase_results)},
         )
     project.state.append_event("phase.completed", task.id, phase=phase.name)
 
@@ -184,6 +193,68 @@ def _assign_work_packages(task: Task) -> None:
         for instance in dev_instances:
             if instance.id == assigned and not instance.work_package_id:
                 instance.work_package_id = package.id
+
+
+def _load_phase_results(task: Task, phase: TaskPhase) -> list:
+    artifact_dir = Path(task.artifacts_dir)
+    candidates = _phase_result_candidates(artifact_dir, phase)
+    results = []
+    seen = set()
+    for from_agent, path in candidates:
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        result = _phase_result_from_payload(payload, phase, from_agent, path)
+        if result:
+            results.append(result)
+    return results
+
+
+def _phase_result_candidates(artifact_dir: Path, phase: TaskPhase) -> list:
+    phase_actor = _phase_actor(phase)
+    instance_candidates = []
+    for instance_id in phase.instance_ids:
+        instance_candidates.extend([
+            (instance_id, artifact_dir / f"{instance_id}_agent_result.json"),
+            (instance_id, artifact_dir / f"{instance_id}_result.json"),
+            (instance_id, artifact_dir / f"{instance_id}_output.json"),
+        ])
+    candidates = [
+        (phase_actor, artifact_dir / f"{phase.name}_agent_result.json"),
+        (phase_actor, artifact_dir / f"{phase.name}_result.json"),
+        (phase_actor, artifact_dir / f"{phase.name}_output.json"),
+    ]
+    if phase.role == "qa" or phase.name == "qa":
+        candidates.insert(0, (phase_actor, artifact_dir / "qa_report.json"))
+    return instance_candidates + candidates
+
+
+def _phase_result_from_payload(
+    payload: Any,
+    phase: TaskPhase,
+    from_agent: str,
+    path: Path,
+) -> Optional[PhaseResult]:
+    if not isinstance(payload, dict) or not payload.get("summary"):
+        return None
+    return PhaseResult(
+        phase=phase.name,
+        from_agent=from_agent,
+        summary=str(payload["summary"]),
+        status=str(payload.get("status", "")),
+        verdict=str(payload["verdict"]) if payload.get("verdict") else None,
+        artifact=str(path.resolve()),
+        data=payload,
+    )
+
+
+def _upsert_phase_results(task: Task, results: list) -> None:
+    by_key = {(result.phase, result.from_agent): result for result in task.phase_results}
+    for result in results:
+        by_key[(result.phase, result.from_agent)] = result
+    task.phase_results = list(by_key.values())
 
 
 def _append_handoff_messages(

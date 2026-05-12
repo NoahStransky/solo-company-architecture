@@ -151,3 +151,78 @@ def test_complete_ingests_cto_output_list_work_packages():
         payload = json.loads(result.output)
         assert payload["task"]["work_packages"][0]["id"] == "setup-runtime"
         assert payload["task"]["work_packages"][0]["agent_instance"] == "dev-1"
+
+
+def test_complete_ingests_agent_results_into_next_package():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        assert runner.invoke(main, ["dispatch", "Build backend API and frontend UI"]).exit_code == 0
+        task_id = json.loads(Path(".solo/state/tasks.json").read_text())["tasks"][0]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "cto_breakdown_output.md").write_text("CTO work packages", encoding="utf-8")
+        assert runner.invoke(main, ["complete", "--json"]).exit_code == 0
+        (artifact_dir / "dev-1_result.json").write_text(
+            json.dumps({
+                "summary": "Implemented API",
+                "status": "completed",
+                "files_changed": ["src/api.py"],
+                "tests": ["pytest tests/test_api.py"],
+            }),
+            encoding="utf-8",
+        )
+        (artifact_dir / "dev-2_result.json").write_text(
+            json.dumps({
+                "summary": "Implemented UI",
+                "status": "completed",
+                "files_changed": ["src/ui.tsx"],
+            }),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["complete", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        task = payload["task"]
+        package = payload["package"]
+        assert [item["from_agent"] for item in task["phase_results"]] == ["dev-1", "dev-2"]
+        assert [item["summary"] for item in task["phase_results"]] == ["Implemented API", "Implemented UI"]
+        assert package["phase_results"] == task["phase_results"]
+        events = [
+            json.loads(line)
+            for line in Path(".solo/state/events.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        assert any(event["event"] == "phase_results.updated" and event["details"]["count"] == 2 for event in events)
+
+
+def test_complete_ingests_qa_report_result():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        assert runner.invoke(main, ["dispatch", "Build backend API and frontend UI"]).exit_code == 0
+        task_id = json.loads(Path(".solo/state/tasks.json").read_text())["tasks"][0]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "cto_breakdown_output.md").write_text("CTO work packages", encoding="utf-8")
+        assert runner.invoke(main, ["complete", "--json"]).exit_code == 0
+        (artifact_dir / "dev_pool_output.md").write_text("Implemented backend and frontend", encoding="utf-8")
+        assert runner.invoke(main, ["complete", "--json"]).exit_code == 0
+        (artifact_dir / "qa_report.json").write_text(
+            json.dumps({
+                "summary": "Smoke tests passed",
+                "verdict": "pass",
+                "tests_run": ["pytest"],
+            }),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["complete", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        qa_result = payload["task"]["phase_results"][0]
+        assert qa_result["phase"] == "qa"
+        assert qa_result["from_agent"] == "qa"
+        assert qa_result["verdict"] == "pass"
+        assert qa_result["data"]["tests_run"] == ["pytest"]

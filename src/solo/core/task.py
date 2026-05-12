@@ -106,6 +106,33 @@ class WorkPackage:
 
 
 @dataclass
+class PhaseResult:
+    phase: str
+    from_agent: str
+    summary: str
+    status: str = ""
+    verdict: Optional[str] = None
+    artifact: str = ""
+    data: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PhaseResult":
+        return cls(
+            phase=data["phase"],
+            from_agent=data.get("from_agent", data.get("agent", "")),
+            summary=data.get("summary", ""),
+            status=data.get("status", ""),
+            verdict=data.get("verdict"),
+            artifact=data.get("artifact", ""),
+            data=dict(data.get("data", {})),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        return {key: value for key, value in data.items() if value not in (None, "", {})}
+
+
+@dataclass
 class Task:
     id: str
     title: str
@@ -117,6 +144,7 @@ class Task:
     artifacts_dir: str
     planned_dev_agents: int = 0
     work_packages: List[WorkPackage] = field(default_factory=list)
+    phase_results: List[PhaseResult] = field(default_factory=list)
     agent_instances: List[AgentInstance] = field(default_factory=list)
     created_at: str = field(default_factory=utc_now_iso)
     updated_at: str = field(default_factory=utc_now_iso)
@@ -134,6 +162,7 @@ class Task:
             artifacts_dir=data.get("artifacts_dir", ""),
             planned_dev_agents=int(data.get("planned_dev_agents", 0)),
             work_packages=[WorkPackage.from_dict(item) for item in data.get("work_packages", [])],
+            phase_results=[PhaseResult.from_dict(item) for item in data.get("phase_results", [])],
             agent_instances=[AgentInstance.from_dict(item) for item in data.get("agent_instances", [])],
             created_at=data.get("created_at", utc_now_iso()),
             updated_at=data.get("updated_at", utc_now_iso()),
@@ -150,6 +179,7 @@ class Task:
             "phases": [phase.to_dict() for phase in self.phases],
             "planned_dev_agents": self.planned_dev_agents,
             "work_packages": [package.to_dict() for package in self.work_packages],
+            "phase_results": [result.to_dict() for result in self.phase_results],
             "agent_instances": [instance.to_dict() for instance in self.agent_instances],
             "artifacts_dir": self.artifacts_dir,
             "created_at": self.created_at,

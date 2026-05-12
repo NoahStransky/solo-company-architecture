@@ -506,6 +506,13 @@ Adapter 建议：
 - 下一阶段 dev package 会包含更新后的 `work_packages` 和 `agent_instances`。
 - 当前验证：`docker compose run --rm test` 通过，`21 passed`。
 
+继续推进结构化结果 / QA report：
+
+- 新增 `phase_results` task state，用于保存 agent result 和 QA report 的结构化摘要。
+- `solo complete` 会读取 `<phase>_agent_result.json` / `<phase>_result.json`、agent pool 的 `<agent_id>_agent_result.json` / `<agent_id>_result.json`，以及 QA 的 `qa_report.json`。
+- 下一阶段 package 会包含 `phase_results`，让 QA / CTO review / secretary report 能看到前序 agent 的结构化输出。
+- 当前验证：`docker compose run --rm test` 通过，`23 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -515,6 +522,7 @@ Adapter 建议：
 - Agent 之间的任务分派和交接已经通过 `messages.jsonl` 可追踪，并区分 sender result 和 next instruction。
 - Hermes/OpenClaw/Codex/Claude Code 先通过 runtime profile + `command` adapter 接入；专用 adapter 不再是近期优先项。
 - CTO -> Dev 的 work package 已从约定文件升级为结构化 task state。
+- Agent result 和 QA report 已能回流到 `phase_results`，并进入下一阶段执行包。
 
 ### Progress Snapshot
 
@@ -532,6 +540,7 @@ Adapter 建议：
 | Agent durable mailbox | Done | `.solo/state/messages.jsonl` 已接入 dispatch/complete/status；handoff artifact/next_instruction 和 agent pool 实例路由已修正 |
 | Runtime profiles / setup | Done | `runtime_profiles` 和 `solo setup runtime` 已实现，并通过容器测试 |
 | Structured contracts / work packages | Done | contracts schema 和 CTO work package ingestion 已实现，并通过容器测试 |
+| Structured phase results / QA reports | Done | agent result / QA report 可回流到 task state，并传入下一阶段 package |
 
 当前新增能力：
 
