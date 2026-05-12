@@ -170,7 +170,15 @@ def test_complete_ingests_agent_results_into_next_package():
         assert runner.invoke(main, ["dispatch", "Build backend API and frontend UI"]).exit_code == 0
         task_id = json.loads(Path(".solo/state/tasks.json").read_text())["tasks"][0]["id"]
         artifact_dir = Path(".solo/artifacts") / task_id
-        (artifact_dir / "cto_breakdown_output.md").write_text("CTO work packages", encoding="utf-8")
+        (artifact_dir / "work_packages.json").write_text(
+            json.dumps({
+                "work_packages": [
+                    {"id": "api", "title": "Build API", "description": "Implement backend routes"},
+                    {"id": "ui", "title": "Build UI", "description": "Implement frontend view"},
+                ]
+            }),
+            encoding="utf-8",
+        )
         assert runner.invoke(main, ["complete", "--json"]).exit_code == 0
         (artifact_dir / "dev-1_result.json").write_text(
             json.dumps({
@@ -198,6 +206,7 @@ def test_complete_ingests_agent_results_into_next_package():
         package = payload["package"]
         assert [item["from_agent"] for item in task["phase_results"]] == ["dev-1", "dev-2"]
         assert [item["summary"] for item in task["phase_results"]] == ["Implemented API", "Implemented UI"]
+        assert [item["status"] for item in task["work_packages"]] == ["completed", "completed"]
         assert package["phase_results"] == task["phase_results"]
         events = [
             json.loads(line)
@@ -205,6 +214,7 @@ def test_complete_ingests_agent_results_into_next_package():
             if line.strip()
         ]
         assert any(event["event"] == "phase_results.updated" and event["details"]["count"] == 2 for event in events)
+        assert any(event["event"] == "work_packages.updated" and event["phase"] == "dev_pool" for event in events)
 
 
 def test_complete_ingests_qa_report_result():

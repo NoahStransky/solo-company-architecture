@@ -37,12 +37,20 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
     loaded_phase_results = _load_phase_results(task, phase)
     if loaded_phase_results:
         _upsert_phase_results(task, loaded_phase_results)
+        updated_work_packages = _sync_work_package_statuses(task, loaded_phase_results)
         project.state.append_event(
             "phase_results.updated",
             task.id,
             phase=phase.name,
             details={"count": len(loaded_phase_results)},
         )
+        if updated_work_packages:
+            project.state.append_event(
+                "work_packages.updated",
+                task.id,
+                phase=phase.name,
+                details={"count": updated_work_packages},
+            )
     project.state.append_event("phase.completed", task.id, phase=phase.name)
 
     next_phase = _next_runnable_phase(task)
@@ -255,6 +263,19 @@ def _upsert_phase_results(task: Task, results: list) -> None:
     for result in results:
         by_key[(result.phase, result.from_agent)] = result
     task.phase_results = list(by_key.values())
+
+
+def _sync_work_package_statuses(task: Task, results: list) -> int:
+    updated = 0
+    for result in results:
+        if result.phase != "dev_pool":
+            continue
+        status = result.status or COMPLETED
+        for work_package in task.work_packages:
+            if work_package.agent_instance == result.from_agent and work_package.status != status:
+                work_package.status = status
+                updated += 1
+    return updated
 
 
 def _append_handoff_messages(

@@ -532,6 +532,12 @@ Adapter 建议：
 - phase event details 保留 `agent_packages` 路径摘要，方便 dashboard 展示每个 dev agent 的入口。
 - 当前验证：`docker compose run --rm test` 通过，`29 passed`。
 
+继续推进 work package 状态回流：
+
+- dev pool 完成时，`solo complete` 会根据 `dev-1_result.json` / `dev-1_agent_result.json` 等结构化结果更新对应 work package status。
+- `work_packages.updated` 事件会记录 dev pool 阶段的状态回流，方便 dashboard 展示每个 work package 的进度。
+- 当前验证：`docker compose run --rm test` 通过，`29 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -545,6 +551,7 @@ Adapter 建议：
 - `.solo/` 协议健康检查已由 `solo validate` 覆盖，可给 solo-os / CI 作为兼容性入口。
 - `solo inspect --json` 已提供单任务详情读取面，方便 dashboard 避免自行扫描和拼接上下文。
 - Agent pool 已生成 per-instance execution package，mailbox 可以把 `dev-1/dev-2/...` 路由到各自 instruction。
+- Dev agent result 已能更新对应 work package status。
 
 ### Progress Snapshot
 
@@ -566,6 +573,7 @@ Adapter 建议：
 | Protocol validation | Done | `solo validate` 检查 `.solo/` 协议结构、配置引用、workflow 和 JSON/JSONL 状态 |
 | Task inspect API | Done | `solo inspect --json` 输出 task、events、messages 和 artifact manifest |
 | Agent pool per-instance packages | Done | dev pool 会生成每个 agent instance 的 input/instruction，并写入 mailbox handoff |
+| Work package status feedback | Done | dev result 会回填对应 work package status，并记录更新事件 |
 
 当前新增能力：
 
