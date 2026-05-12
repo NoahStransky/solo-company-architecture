@@ -513,6 +513,12 @@ Adapter 建议：
 - 下一阶段 package 会包含 `phase_results`，让 QA / CTO review / secretary report 能看到前序 agent 的结构化输出。
 - 当前验证：`docker compose run --rm test` 通过，`23 passed`。
 
+继续推进协议健康检查：
+
+- 新增 `solo validate`，用于检查 `.solo/` 目录、contracts、config 引用、workflow 依赖和 JSON/JSONL 状态文件。
+- `solo validate --json` 输出 `ok`、summary、errors、warnings，方便 `solo-os` 或 CI 读取。
+- 当前验证：`docker compose run --rm test` 通过，`26 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -523,6 +529,7 @@ Adapter 建议：
 - Hermes/OpenClaw/Codex/Claude Code 先通过 runtime profile + `command` adapter 接入；专用 adapter 不再是近期优先项。
 - CTO -> Dev 的 work package 已从约定文件升级为结构化 task state。
 - Agent result 和 QA report 已能回流到 `phase_results`，并进入下一阶段执行包。
+- `.solo/` 协议健康检查已由 `solo validate` 覆盖，可给 solo-os / CI 作为兼容性入口。
 
 ### Progress Snapshot
 
@@ -541,6 +548,7 @@ Adapter 建议：
 | Runtime profiles / setup | Done | `runtime_profiles` 和 `solo setup runtime` 已实现，并通过容器测试 |
 | Structured contracts / work packages | Done | contracts schema 和 CTO work package ingestion 已实现，并通过容器测试 |
 | Structured phase results / QA reports | Done | agent result / QA report 可回流到 task state，并传入下一阶段 package |
+| Protocol validation | Done | `solo validate` 检查 `.solo/` 协议结构、配置引用、workflow 和 JSON/JSONL 状态 |
 
 当前新增能力：
 

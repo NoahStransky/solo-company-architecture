@@ -9,6 +9,7 @@ from .commands.init_cmd import init
 from .commands.setup_cmd import setup
 from .commands.start_cmd import start
 from .commands.status_cmd import status
+from .commands.validate_cmd import validate
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -23,3 +24,4 @@ main.add_command(complete)
 main.add_command(status)
 main.add_command(start)
 main.add_command(setup)
+main.add_command(validate)

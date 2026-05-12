@@ -38,6 +38,7 @@ solo dispatch --adapter command --json "Run with an external runtime"
 solo complete
 solo status
 solo status --json
+solo validate --json
 solo start
 ```
 
@@ -159,6 +160,15 @@ The generic `command` adapter can hand the prepared package to Hermes, OpenClaw,
 
 Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runtime.json`; `events.jsonl` stores a lightweight pointer and return code for dashboards.
 
+## Protocol Validation
+
+Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, and JSON/JSONL state files.
+
+```bash
+solo validate
+solo validate --json
+```
+
 ## Current Commands
 
 ```bash
@@ -168,6 +178,7 @@ solo complete
 solo status
 solo start
 solo setup runtime
+solo validate
 ```
 
 The protocol-first dispatcher can either generate packages for manual completion or run a configured external command adapter.
