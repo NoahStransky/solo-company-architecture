@@ -25,6 +25,10 @@ def test_complete_advances_to_dev_pool_after_cto_breakdown():
         assert task["current_phase"] == "dev_pool"
         assert payload["package"]["phase"] == "dev_pool"
         assert Path(payload["package"]["instruction"]).exists()
+        assert Path(payload["package"]["agent_packages"]["dev-1"]["instruction"]).exists()
+        assert Path(payload["package"]["agent_packages"]["dev-2"]["instruction"]).exists()
+        package_input = json.loads(Path(payload["package"]["input"]).read_text())
+        assert package_input["agent_packages"]["dev-1"]["instruction"].endswith("dev-1_instruction.md")
         messages = [
             json.loads(line)
             for line in Path(".solo/state/messages.jsonl").read_text().splitlines()
@@ -35,6 +39,10 @@ def test_complete_advances_to_dev_pool_after_cto_breakdown():
         assert {message["from"] for message in handoffs} == {"cto"}
         assert {message["artifact"] for message in handoffs} == {str(cto_output.resolve())}
         assert all(Path(message["details"]["next_instruction"]).exists() for message in handoffs)
+        assert handoffs[0]["details"]["next_instruction"].endswith("dev-1_instruction.md")
+        assert handoffs[1]["details"]["next_instruction"].endswith("dev-2_instruction.md")
+        assert handoffs[0]["details"]["next_input"].endswith("dev-1_input.json")
+        assert handoffs[1]["details"]["next_input"].endswith("dev-2_input.json")
 
         dev_output = Path(".solo/artifacts") / task_id / "dev_pool_output.md"
         dev_output.write_text("Implemented backend and frontend", encoding="utf-8")
@@ -117,6 +125,8 @@ def test_complete_ingests_cto_work_packages():
         assert [item["id"] for item in task["work_packages"]] == ["api", "ui"]
         assert [item["agent_instance"] for item in task["work_packages"]] == ["dev-1", "dev-2"]
         assert [item["id"] for item in package["work_packages"]] == ["api", "ui"]
+        assert [item["id"] for item in package["agent_packages"]["dev-1"]["work_packages"]] == ["api"]
+        assert [item["id"] for item in package["agent_packages"]["dev-2"]["work_packages"]] == ["ui"]
         state = json.loads(Path(".solo/state/tasks.json").read_text())
         assert state["tasks"][0]["work_packages"][0]["agent_instance"] == "dev-1"
         events = [

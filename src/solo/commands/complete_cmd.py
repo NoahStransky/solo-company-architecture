@@ -265,9 +265,9 @@ def _append_handoff_messages(
     package: Optional[Dict[str, Any]],
 ) -> None:
     artifact = _phase_result_artifact(task, phase)
-    details = _handoff_details(package)
     for sender in _phase_senders(phase):
         for recipient in _phase_recipients(next_phase):
+            details = _handoff_details(package, recipient)
             project.state.append_message(
                 task.id,
                 from_agent=sender,
@@ -309,13 +309,20 @@ def _phase_result_artifact(task: Task, phase: TaskPhase) -> str:
     return ""
 
 
-def _handoff_details(package: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _handoff_details(package: Optional[Dict[str, Any]], recipient: str = "") -> Optional[Dict[str, Any]]:
     if not package:
         return None
     details = phase_event_details(package)
-    next_instruction = package.get("instruction") or package.get("report")
+    details.pop("agent_packages", None)
+    agent_package = (package.get("agent_packages") or {}).get(recipient, {})
+    next_instruction = agent_package.get("instruction") or package.get("instruction") or package.get("report")
+    next_input = agent_package.get("input")
     if next_instruction:
         details["next_instruction"] = next_instruction
+    if next_input:
+        details["next_input"] = next_input
+    if agent_package.get("work_packages"):
+        details["work_packages"] = agent_package["work_packages"]
     return details
 
 

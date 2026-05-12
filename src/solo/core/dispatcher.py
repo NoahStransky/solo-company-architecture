@@ -94,6 +94,8 @@ class PackageDispatcher(ExecutionAdapter):
         input_path = artifact_dir / f"{phase.name}_input.json"
         instruction_path = artifact_dir / f"{phase.name}_instruction.md"
         task_path = artifact_dir / "task.json"
+        agent_packages = self._agent_pool_packages(package, agent.prompt, phase, artifact_dir)
+        package["agent_packages"] = agent_packages
 
         input_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         task_path.write_text(json.dumps(task.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -111,12 +113,53 @@ class PackageDispatcher(ExecutionAdapter):
             "agent_instances": [instance.to_dict() for instance in task.agent_instances],
             "work_packages": [package.to_dict() for package in task.work_packages],
             "phase_results": [result.to_dict() for result in task.phase_results],
+            "agent_packages": agent_packages,
             "input": str(input_path),
             "instruction": str(instruction_path),
             "task": str(task_path),
         }
 
-    def _instruction(self, prompt: str, package: Dict[str, Any], phase: TaskPhase) -> str:
+    def _agent_pool_packages(
+        self,
+        package: Dict[str, Any],
+        prompt: str,
+        phase: TaskPhase,
+        artifact_dir: Path,
+    ) -> Dict[str, Any]:
+        if phase.type != AGENT_POOL:
+            return {}
+        agent_packages = {}
+        for instance_id in phase.instance_ids:
+            assigned = [
+                work_package
+                for work_package in package["work_packages"]
+                if work_package.get("agent_instance") == instance_id
+            ]
+            instance_package = dict(package)
+            instance_package["agent_instance"] = instance_id
+            instance_package["assigned_work_packages"] = assigned
+            input_path = artifact_dir / f"{instance_id}_input.json"
+            instruction_path = artifact_dir / f"{instance_id}_instruction.md"
+            input_path.write_text(json.dumps(instance_package, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            instruction_path.write_text(
+                self._instruction(prompt, instance_package, phase, agent_instance=instance_id),
+                encoding="utf-8",
+            )
+            agent_packages[instance_id] = {
+                "agent_instance": instance_id,
+                "input": str(input_path),
+                "instruction": str(instruction_path),
+                "work_packages": assigned,
+            }
+        return agent_packages
+
+    def _instruction(
+        self,
+        prompt: str,
+        package: Dict[str, Any],
+        phase: TaskPhase,
+        agent_instance: str = "",
+    ) -> str:
         lines = [
             f"# Agent execution package: {phase.name}",
             "",
@@ -147,6 +190,16 @@ class PackageDispatcher(ExecutionAdapter):
             "",
             f"Write your result into `{package['output_dir']}/{phase.name}_output.md`.",
         ]
+        if phase.name == "cto_breakdown":
+            lines.extend([
+                "",
+                "Also write structured work packages into `work_packages.json` using `.solo/contracts/work_packages.schema.json`.",
+            ])
+        if phase.role == "qa" or phase.name == "qa":
+            lines.extend([
+                "",
+                "Also write a structured QA report into `qa_report.json` using `.solo/contracts/qa_report.schema.json`.",
+            ])
         if phase.type == AGENT_POOL:
             lines.extend([
                 "",
@@ -155,6 +208,16 @@ class PackageDispatcher(ExecutionAdapter):
                 f"Secretary planned {package['planned_dev_agents']} dev agent(s) for this task.",
                 "CTO should provide work packages that can be assigned without overlapping file ownership.",
             ])
+            if agent_instance:
+                lines.extend([
+                    "",
+                    f"Agent instance: `{agent_instance}`",
+                    f"Write your structured result into `{package['output_dir']}/{agent_instance}_agent_result.json` using `.solo/contracts/agent_result.schema.json`.",
+                    "",
+                    "Assigned work packages:",
+                    "",
+                    *(self._work_package_lines(package.get("assigned_work_packages", []))),
+                ])
         return "\n".join(lines) + "\n"
 
     def _system_report(self, task: Task, phase: TaskPhase) -> str:
@@ -183,6 +246,14 @@ class PackageDispatcher(ExecutionAdapter):
         return [
             f"- `{name}`: `{config.get('command', '')} {' '.join(config.get('args', []))}`"
             for name, config in mcp_servers.items()
+        ]
+
+    def _work_package_lines(self, work_packages: list) -> list:
+        if not work_packages:
+            return ["No work package has been assigned to this agent instance yet."]
+        return [
+            f"- `{item.get('id', '')}`: {item.get('title', '')} - {item.get('description', '')}"
+            for item in work_packages
         ]
 
 
@@ -287,6 +358,16 @@ def phase_event_details(package: Dict[str, Any]) -> Dict[str, Any]:
     for key in ("input", "instruction", "report", "runtime_report"):
         if package.get(key):
             details[key] = package[key]
+    agent_packages = package.get("agent_packages") or {}
+    if agent_packages:
+        details["agent_packages"] = {
+            agent_id: {
+                key: value
+                for key, value in agent_package.items()
+                if key in ("input", "instruction")
+            }
+            for agent_id, agent_package in agent_packages.items()
+        }
     runtime = package.get("runtime") or {}
     if "returncode" in runtime:
         details["runtime_returncode"] = runtime["returncode"]
