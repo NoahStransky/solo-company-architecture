@@ -86,6 +86,18 @@ delegation:
 
 Agent communication uses a durable mailbox in `.solo/state/messages.jsonl`. Messages only store routing metadata and artifact pointers; large task briefs, instructions, runtime output, implementation reports, and QA reports stay in `.solo/artifacts/<task_id>/`. For handoffs, `artifact` points to an existing sender result when one exists, while `details.next_instruction` points to the next phase package. Agent pools are expanded to concrete recipients and execution packages such as `dev-1_input.json` / `dev-1_instruction.md`; structured dev results update their assigned work package status.
 
+Dev results can update work package status with:
+
+```json
+{
+  "summary": "Implemented API; tests are blocked",
+  "work_packages": [
+    {"id": "api", "status": "completed"},
+    {"id": "tests", "status": "blocked"}
+  ]
+}
+```
+
 ## Agent Providers, MCP, And Skills
 
 Configure agent routing in `.solo/config.yaml`.

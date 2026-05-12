@@ -8,6 +8,19 @@
     "status": {"type": "string"},
     "artifacts": {"type": "array", "items": {"type": "string"}},
     "files_changed": {"type": "array", "items": {"type": "string"}},
+    "work_packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": {"type": "string"},
+          "status": {"type": "string"},
+          "summary": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
     "tests": {"type": "array", "items": {"type": "string"}},
     "risks": {"type": "array", "items": {"type": "string"}}
   },

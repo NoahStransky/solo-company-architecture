@@ -535,8 +535,9 @@ Adapter 建议：
 继续推进 work package 状态回流：
 
 - dev pool 完成时，`solo complete` 会根据 `dev-1_result.json` / `dev-1_agent_result.json` 等结构化结果更新对应 work package status。
+- agent result 可通过 `work_packages: [{id, status}]` 逐个回填 work package 状态；没有逐项状态时才按 agent result 的整体 `status` 回填。
 - `work_packages.updated` 事件会记录 dev pool 阶段的状态回流，方便 dashboard 展示每个 work package 的进度。
-- 当前验证：`docker compose run --rm test` 通过，`29 passed`。
+- 当前验证：`docker compose run --rm test` 通过，`30 passed`。
 
 当前状态：
 

@@ -246,3 +246,47 @@ def test_complete_ingests_qa_report_result():
         assert qa_result["from_agent"] == "qa"
         assert qa_result["verdict"] == "pass"
         assert qa_result["data"]["tests_run"] == ["pytest"]
+
+
+def test_complete_uses_explicit_work_package_statuses_from_agent_result():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        assert runner.invoke(main, ["dispatch", "Build backend API, frontend UI, and tests"]).exit_code == 0
+        task_id = json.loads(Path(".solo/state/tasks.json").read_text())["tasks"][0]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "work_packages.json").write_text(
+            json.dumps({
+                "work_packages": [
+                    {"id": "api", "title": "Build API", "description": "Implement backend routes"},
+                    {"id": "ui", "title": "Build UI", "description": "Implement frontend view"},
+                    {"id": "tests", "title": "Add tests", "description": "Cover API and UI flows"},
+                ]
+            }),
+            encoding="utf-8",
+        )
+        assert runner.invoke(main, ["complete", "--json"]).exit_code == 0
+        (artifact_dir / "dev-1_agent_result.json").write_text(
+            json.dumps({
+                "summary": "Implemented API; tests are blocked",
+                "work_packages": [
+                    {"id": "api", "status": "completed"},
+                    {"id": "tests", "status": "blocked"},
+                ],
+            }),
+            encoding="utf-8",
+        )
+        (artifact_dir / "dev-2_agent_result.json").write_text(
+            json.dumps({
+                "summary": "Implemented UI",
+                "status": "completed",
+            }),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["complete", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert [item["id"] for item in payload["task"]["work_packages"]] == ["api", "ui", "tests"]
+        assert [item["status"] for item in payload["task"]["work_packages"]] == ["completed", "completed", "blocked"]

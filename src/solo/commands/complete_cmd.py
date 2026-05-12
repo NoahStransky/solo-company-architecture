@@ -270,12 +270,35 @@ def _sync_work_package_statuses(task: Task, results: list) -> int:
     for result in results:
         if result.phase != "dev_pool":
             continue
+        explicit_statuses = _work_package_statuses_from_result(result)
+        if explicit_statuses:
+            for work_package in task.work_packages:
+                status = explicit_statuses.get(work_package.id)
+                if status and work_package.status != status:
+                    work_package.status = status
+                    updated += 1
+            continue
         status = result.status or COMPLETED
         for work_package in task.work_packages:
             if work_package.agent_instance == result.from_agent and work_package.status != status:
                 work_package.status = status
                 updated += 1
     return updated
+
+
+def _work_package_statuses_from_result(result: PhaseResult) -> Dict[str, str]:
+    statuses = {}
+    items = result.data.get("work_packages", [])
+    if not isinstance(items, list):
+        return statuses
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        package_id = str(item.get("id", "")).strip()
+        status = str(item.get("status", "")).strip()
+        if package_id and status:
+            statuses[package_id] = status
+    return statuses
 
 
 def _append_handoff_messages(
