@@ -35,6 +35,7 @@ solo init --yes
 solo dispatch --workflow feature "Build RSS subscriptions"
 solo setup runtime local-codex --preset codex --for dev --for qa
 solo dispatch --adapter command --json "Run with an external runtime"
+solo inspect --json
 solo complete
 solo status
 solo status --json
@@ -174,6 +175,7 @@ solo validate --json
 ```bash
 solo init
 solo dispatch
+solo inspect
 solo complete
 solo status
 solo start

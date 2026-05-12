@@ -519,6 +519,12 @@ Adapter 建议：
 - `solo validate --json` 输出 `ok`、summary、errors、warnings，方便 `solo-os` 或 CI 读取。
 - 当前验证：`docker compose run --rm test` 通过，`26 passed`。
 
+继续推进 task inspect 读取面：
+
+- 新增 `solo inspect` / `solo inspect --json`，按 task 输出 task snapshot、events、messages 和 artifact manifest。
+- artifact manifest 会标记 input、instruction、runtime、agent_result、qa_report、work_packages、task_snapshot 等 kind。
+- 当前验证：`docker compose run --rm test` 通过，`29 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -530,6 +536,7 @@ Adapter 建议：
 - CTO -> Dev 的 work package 已从约定文件升级为结构化 task state。
 - Agent result 和 QA report 已能回流到 `phase_results`，并进入下一阶段执行包。
 - `.solo/` 协议健康检查已由 `solo validate` 覆盖，可给 solo-os / CI 作为兼容性入口。
+- `solo inspect --json` 已提供单任务详情读取面，方便 dashboard 避免自行扫描和拼接上下文。
 
 ### Progress Snapshot
 
@@ -549,6 +556,7 @@ Adapter 建议：
 | Structured contracts / work packages | Done | contracts schema 和 CTO work package ingestion 已实现，并通过容器测试 |
 | Structured phase results / QA reports | Done | agent result / QA report 可回流到 task state，并传入下一阶段 package |
 | Protocol validation | Done | `solo validate` 检查 `.solo/` 协议结构、配置引用、workflow 和 JSON/JSONL 状态 |
+| Task inspect API | Done | `solo inspect --json` 输出 task、events、messages 和 artifact manifest |
 
 当前新增能力：
 
