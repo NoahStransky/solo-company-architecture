@@ -581,6 +581,13 @@ Adapter 建议：
 - 修复 `solo dispatch --to <missing-role>` 和未知 workflow 的错误处理，避免内部异常泄漏到 CLI。
 - 当前验证：`docker compose run --rm test` 通过，`55 passed, 5 xfailed`。
 
+继续研究 runtime orchestration 下一层：
+
+- 记录到 `docs/research/solo-cli-research.md`：下一阶段应先抽 `PhaseRunner` / `RunLoop` / `RecoveryService`，而不是立即增加专用 Hermes/Codex/Claude adapter。
+- 明确 `run --until`、`reopen`、`retry --phase`、`retry --agent` 的状态语义和建议事件。
+- 识别 agent pool 当前风险：per-instance package 已完成，但 runtime 仍是串行；失败时需要先按 instance 更新状态，才能支持 agent-level retry。
+- 推荐顺序：先 runner/refactor，再 `run --until`，再 `reopen/retry`，最后做 bounded parallel execution。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -601,6 +608,7 @@ Adapter 建议：
 - default template 已包含 runtime wrapper contract 和 dummy runtime 示例。
 - retry / reopen / run-until 的测试规格已先行建立。
 - 已有 CLI commands 的项目边界、交互入口、错误路径和 setup runtime 分支已补测试覆盖。
+- runtime orchestration 下一层已完成研究记录，下一步实现优先级是 runner/refactor 与 `run --until`。
 
 ### Progress Snapshot
 
@@ -629,6 +637,7 @@ Adapter 建议：
 | Runtime wrapper contract | Done | default template 包含 wrapper contract 和 dummy runtime 示例 |
 | Retry / reopen / run-until specs | Test-first | 已创建严格 xfail 测试，作为下一阶段实现验收线 |
 | CLI command coverage | Done | 已补齐已有命令的 project boundary、help、start/status/inspect/complete/setup 错误路径测试 |
+| Runtime orchestration research | Done | 已明确 runner/recovery/run-loop 设计和并行 agent pool 的实现顺序 |
 
 当前新增能力：
 
@@ -794,6 +803,18 @@ tests/test_solo/
 ---
 
 ## 十一、推荐下一步
+
+最新推荐实现顺序：
+
+1. 抽 `solo.core.runner`，把 `complete_task` 内的 phase 推进、adapter 调用、failure 处理拆到可复用服务。
+2. 实现 `solo run --until <phase|blocked|done>`，移除对应 strict xfail。
+3. 实现 `solo reopen --phase`，支持不运行 runtime 的失败恢复。
+4. 实现 `solo retry --phase`，复用 reopen + run-once。
+5. 改进 agent pool 部分失败状态，按 instance returncode 更新 agent instance。
+6. 实现 `solo retry --agent`。
+7. 在 command adapter 内加入 bounded parallel execution，使用 `delegation.max_parallel_dev_agents` 控制并发。
+
+旧 MVP 闭环仍然保持：
 
 当前 MVP 闭环：
 
