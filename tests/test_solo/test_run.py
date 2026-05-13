@@ -3,7 +3,6 @@ from pathlib import Path
 import sys
 
 from click.testing import CliRunner
-import pytest
 import yaml
 
 from solo.cli import main
@@ -136,7 +135,6 @@ def test_run_with_template_dummy_runtime_advances_multiple_phases():
         assert state["tasks"][0]["work_packages"][0]["status"] == "completed"
 
 
-@pytest.mark.xfail(strict=True, reason="solo run --until is not implemented yet")
 def test_run_until_qa_advances_until_requested_phase():
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -160,11 +158,13 @@ def test_run_until_qa_advances_until_requested_phase():
         payload = json.loads(result.output)
         assert payload["task"]["status"] == "in_progress"
         assert payload["task"]["current_phase"] == "qa"
-        assert [phase["status"] for phase in payload["task"]["phases"][:2]] == ["completed", "completed"]
+        phase_statuses = {phase["name"]: phase["status"] for phase in payload["task"]["phases"]}
+        assert phase_statuses["cto_breakdown"] == "completed"
+        assert phase_statuses["ceo_check"] == "skipped"
+        assert phase_statuses["dev_pool"] == "completed"
         assert payload["stopped_reason"] == "reached_phase"
 
 
-@pytest.mark.xfail(strict=True, reason="solo run --until is not implemented yet")
 def test_run_until_blocked_stops_on_runtime_failure():
     runner = CliRunner()
     with runner.isolated_filesystem():

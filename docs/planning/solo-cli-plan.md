@@ -588,6 +588,16 @@ Adapter 建议：
 - 识别 agent pool 当前风险：per-instance package 已完成，但 runtime 仍是串行；失败时需要先按 instance 更新状态，才能支持 agent-level retry。
 - 推荐顺序：先 runner/refactor，再 `run --until`，再 `reopen/retry`，最后做 bounded parallel execution。
 
+继续实现 runtime orchestration：
+
+- 新增 `solo.core.runner`，集中管理 phase complete、phase prepare、run loop、reopen、retry phase、retry agent 的状态语义。
+- `solo run` 新增 `--until <phase|blocked|done>`，并保留 `--once` 单步推进。
+- 新增 `solo reopen --phase`、`solo retry --phase`、`solo retry --agent` 命令。
+- command adapter 的 agent pool runtime 改为 bounded parallel execution，并使用 `delegation.max_parallel_dev_agents` 控制并发。
+- agent pool runtime 失败时会按 instance returncode 更新 agent instance 状态，支持只重试失败 agent。
+- 原先 5 个 strict xfail 验收测试已转为正式回归测试。
+- 当前验证：`docker compose run --rm test` 通过，`62 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -609,6 +619,7 @@ Adapter 建议：
 - retry / reopen / run-until 的测试规格已先行建立。
 - 已有 CLI commands 的项目边界、交互入口、错误路径和 setup runtime 分支已补测试覆盖。
 - runtime orchestration 下一层已完成研究记录，下一步实现优先级是 runner/refactor 与 `run --until`。
+- runtime orchestration 已完成第一版：`run --until`、`reopen`、`retry phase`、`retry agent`、agent pool 部分失败状态和 bounded parallel execution 均已落地。
 
 ### Progress Snapshot
 
@@ -635,9 +646,10 @@ Adapter 建议：
 | Command adapter agent pool runtime | Done | command runtime 会按 agent instance 分别执行，并写 per-agent runtime report |
 | Run once / runtime failure semantics | Done | `solo run --once` 可推进一阶段；command runtime 失败会标记 phase/task failed |
 | Runtime wrapper contract | Done | default template 包含 wrapper contract 和 dummy runtime 示例 |
-| Retry / reopen / run-until specs | Test-first | 已创建严格 xfail 测试，作为下一阶段实现验收线 |
+| Retry / reopen / run-until specs | Done | 原严格 xfail 测试已转为正式回归测试 |
 | CLI command coverage | Done | 已补齐已有命令的 project boundary、help、start/status/inspect/complete/setup 错误路径测试 |
 | Runtime orchestration research | Done | 已明确 runner/recovery/run-loop 设计和并行 agent pool 的实现顺序 |
+| Runtime orchestration implementation | Done | 已实现 `solo.core.runner`、`run --until`、`reopen`、`retry`、agent pool 部分失败和 bounded parallel execution |
 
 当前新增能力：
 

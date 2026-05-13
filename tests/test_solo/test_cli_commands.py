@@ -15,6 +15,8 @@ from solo.cli import main
         (["inspect"], "No .solo project found"),
         (["complete"], "No .solo project found"),
         (["run", "--once"], "No .solo project found"),
+        (["reopen", "--phase", "dev_pool"], "No .solo project found"),
+        (["retry", "--phase", "dev_pool"], "No .solo project found"),
         (["start"], "No .solo project found"),
         (["validate"], "No .solo project found"),
         (["setup", "runtime", "local", "--command", "echo"], "No .solo project found"),
@@ -35,7 +37,7 @@ def test_cli_help_lists_all_project_commands():
     result = runner.invoke(main, ["--help"])
 
     assert result.exit_code == 0, result.output
-    for command in ("init", "dispatch", "inspect", "complete", "run", "status", "start", "setup", "validate"):
+    for command in ("init", "dispatch", "inspect", "complete", "reopen", "retry", "run", "status", "start", "setup", "validate"):
         assert command in result.output
 
 

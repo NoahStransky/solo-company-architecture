@@ -3,7 +3,6 @@ from pathlib import Path
 import sys
 
 from click.testing import CliRunner
-import pytest
 import yaml
 
 from solo.cli import main
@@ -21,7 +20,6 @@ def _configure_command(config_path: Path, command: str, args: list) -> None:
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
 
 
-@pytest.mark.xfail(strict=True, reason="solo retry is not implemented yet")
 def test_retry_phase_reruns_failed_phase_and_restores_progress():
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -43,7 +41,7 @@ def test_retry_phase_reruns_failed_phase_and_restores_progress():
         assert retried.exit_code == 0, retried.output
         payload = json.loads(retried.output)
         assert payload["task"]["status"] == "in_progress"
-        assert payload["task"]["current_phase"] == "dev_pool"
+        assert payload["task"]["current_phase"] == "qa"
         dev_phase = [phase for phase in payload["task"]["phases"] if phase["name"] == "dev_pool"][0]
         assert dev_phase["status"] == "completed"
         assert payload["next_phase"]["name"] == "qa"
@@ -55,7 +53,6 @@ def test_retry_phase_reruns_failed_phase_and_restores_progress():
         assert any(event["event"] == "phase.retried" and event["phase"] == "dev_pool" for event in events)
 
 
-@pytest.mark.xfail(strict=True, reason="solo reopen is not implemented yet")
 def test_reopen_failed_phase_resets_state_without_running_runtime():
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -85,7 +82,6 @@ def test_reopen_failed_phase_resets_state_without_running_runtime():
         assert any(event["event"] == "phase.reopened" and event["phase"] == "dev_pool" for event in events)
 
 
-@pytest.mark.xfail(strict=True, reason="agent-level retry is not implemented yet")
 def test_retry_agent_only_reruns_target_failed_agent_instance():
     runner = CliRunner()
     with runner.isolated_filesystem():

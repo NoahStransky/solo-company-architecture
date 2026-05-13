@@ -1,6 +1,7 @@
 """Execution package generation."""
 
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 from pathlib import Path
@@ -281,21 +282,31 @@ class CommandDispatcher(ExecutionAdapter):
         agent_packages = package_result.get("agent_packages") or {}
         if phase.type == AGENT_POOL and agent_packages:
             agent_runtimes = {}
-            returncodes = []
-            for instance_id, agent_package in agent_packages.items():
-                runtime_result = self._run_command(runtime, package_result, task, phase, agent_package)
-                runtime_path = Path(task.artifacts_dir) / f"{instance_id}_runtime.json"
-                runtime_path.write_text(json.dumps(runtime_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-                agent_runtimes[instance_id] = {
-                    "runtime": runtime_result,
-                    "runtime_report": str(runtime_path),
+            max_workers = max(1, min(len(agent_packages), self.config.delegation.max_parallel_dev_agents))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(self._run_command, runtime, package_result, task, phase, agent_package): (instance_id, agent_package)
+                    for instance_id, agent_package in agent_packages.items()
                 }
-                returncodes.append(runtime_result["returncode"])
+                for future in as_completed(futures):
+                    instance_id, _agent_package = futures[future]
+                    runtime_result = future.result()
+                    runtime_path = Path(task.artifacts_dir) / f"{instance_id}_runtime.json"
+                    runtime_path.write_text(json.dumps(runtime_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    agent_runtimes[instance_id] = {
+                        "runtime": runtime_result,
+                        "runtime_report": str(runtime_path),
+                    }
 
+            returncodes = [
+                item["runtime"]["returncode"]
+                for item in agent_runtimes.values()
+            ]
             aggregate_runtime = {
                 "returncode": max(returncodes) if returncodes else 0,
                 "agent_count": len(agent_runtimes),
                 "agent_runtimes": agent_runtimes,
+                "max_parallel": max_workers,
             }
             runtime_path = Path(task.artifacts_dir) / f"{phase.name}_runtime.json"
             runtime_path.write_text(json.dumps(aggregate_runtime, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -319,6 +330,42 @@ class CommandDispatcher(ExecutionAdapter):
             result["runtime_profile"] = profile_name
         result["runtime"] = runtime_result
         result["runtime_report"] = str(runtime_path)
+        return result
+
+    def prepare_agent_instance(self, task: Task, phase: TaskPhase, agent_id: str) -> Dict[str, Any]:
+        package_result = self.package_dispatcher.prepare_phase(task, phase)
+        role = package_result["agent_role"]
+        runtime, profile_name = self.config.get_command_runtime_for_role(role)
+        if not runtime.command:
+            raise ValueError("execution.command.command or runtime profile command is required for command adapter")
+        agent_package = (package_result.get("agent_packages") or {}).get(agent_id)
+        if not agent_package:
+            raise ValueError(f"Agent package not found: {agent_id}")
+
+        runtime_result = self._run_command(runtime, package_result, task, phase, agent_package)
+        runtime_path = Path(task.artifacts_dir) / f"{agent_id}_runtime.json"
+        runtime_path.write_text(json.dumps(runtime_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        agent_runtimes = {
+            agent_id: {
+                "runtime": runtime_result,
+                "runtime_report": str(runtime_path),
+            }
+        }
+        aggregate_runtime = {
+            "returncode": runtime_result["returncode"],
+            "agent_count": 1,
+            "agent_runtimes": agent_runtimes,
+        }
+        aggregate_path = Path(task.artifacts_dir) / f"{phase.name}_runtime.json"
+        aggregate_path.write_text(json.dumps(aggregate_runtime, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        result = dict(package_result)
+        result["adapter"] = self.name
+        if profile_name:
+            result["runtime_profile"] = profile_name
+        result["runtime"] = runtime_result
+        result["runtime_report"] = str(runtime_path)
+        result["agent_runtimes"] = agent_runtimes
         return result
 
     def _run_command(
