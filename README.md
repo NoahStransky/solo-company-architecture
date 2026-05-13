@@ -178,6 +178,8 @@ Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runt
 
 Use `solo run --once` to advance the current task by one phase. If a command runtime returns a non-zero exit code, Solo marks the phase and task as `failed`, writes a `phase.failed` event, and does not hand off to the next agent.
 
+New projects include `.solo/runtime/wrapper-contract.md` and `.solo/runtime/examples/dummy_runtime.py`. The dummy runtime is useful for checking the end-to-end workflow before wiring a real external agent CLI.
+
 ## Protocol Validation
 
 Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, JSON/JSONL state files, and structured artifact contracts.

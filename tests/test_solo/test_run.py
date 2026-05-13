@@ -99,3 +99,37 @@ def test_dispatch_marks_initial_phase_failed_when_runtime_fails():
             if line.strip()
         ]
         assert any(event["event"] == "phase.failed" and event["phase"] == "cto_breakdown" for event in events)
+
+
+def test_run_with_template_dummy_runtime_advances_multiple_phases():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        config_path = Path(".solo/config.yaml")
+        config = yaml.safe_load(config_path.read_text())
+        dummy_runtime = str((Path.cwd() / ".solo/runtime/examples/dummy_runtime.py").resolve())
+        config["execution"]["default_adapter"] = "command"
+        config["execution"]["command"] = {
+            "command": sys.executable,
+            "args": [dummy_runtime],
+            "timeout": 30,
+            "env": {},
+        }
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build dummy runtime flow"])
+        task_id = json.loads(dispatch.output)["task"]["id"]
+
+        first = runner.invoke(main, ["run", "--once", "--json"])
+        second = runner.invoke(main, ["run", "--once", "--json"])
+
+        assert first.exit_code == 0, first.output
+        assert second.exit_code == 0, second.output
+        first_payload = json.loads(first.output)
+        second_payload = json.loads(second.output)
+        assert first_payload["next_phase"]["name"] == "dev_pool"
+        assert second_payload["next_phase"]["name"] == "qa"
+        artifact_dir = Path(".solo/artifacts") / task_id
+        assert (artifact_dir / "work_packages.json").exists()
+        assert (artifact_dir / "dev-1_agent_result.json").exists()
+        state = json.loads(Path(".solo/state/tasks.json").read_text())
+        assert state["tasks"][0]["work_packages"][0]["status"] == "completed"

@@ -23,6 +23,8 @@ def test_init_creates_solo_protocol_files():
         assert Path(".solo/contracts/agent_result.schema.json").exists()
         assert Path(".solo/contracts/qa_report.schema.json").exists()
         assert Path(".solo/contracts/message.schema.json").exists()
+        assert Path(".solo/runtime/wrapper-contract.md").exists()
+        assert Path(".solo/runtime/examples/dummy_runtime.py").exists()
         assert Path(".solo/artifacts").is_dir()
         assert Path(".soloignore").exists()
 

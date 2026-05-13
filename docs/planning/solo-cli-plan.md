@@ -562,6 +562,12 @@ Adapter 建议：
 - 已禁止直接 complete 一个 failed phase，后续需要通过 retry/reopen 机制恢复。
 - 当前验证：`docker compose run --rm test` 通过，`37 passed`。
 
+继续推进 runtime wrapper contract：
+
+- default template 新增 `.solo/runtime/wrapper-contract.md`，明确 command adapter wrapper 可读环境变量、placeholder、必写 artifact 和 exit code 语义。
+- default template 新增 `.solo/runtime/examples/dummy_runtime.py`，可用于在没有真实 Codex/Claude/Hermes wrapper 时验证端到端 workflow。
+- 当前验证：`docker compose run --rm test` 通过，`38 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -579,6 +585,7 @@ Adapter 建议：
 - `solo validate` 已覆盖结构化 artifacts 的轻量 contract validation。
 - `command` adapter 已能按 agent pool instance 分别运行外部 runtime。
 - `solo run --once` 已成为推进当前 task 的统一入口；runtime 失败会落到 `failed` 状态和 `phase.failed` 事件。
+- default template 已包含 runtime wrapper contract 和 dummy runtime 示例。
 
 ### Progress Snapshot
 
@@ -604,6 +611,7 @@ Adapter 建议：
 | Artifact contract validation | Done | `solo validate` 会检查 work packages、agent result、QA report 等 artifact |
 | Command adapter agent pool runtime | Done | command runtime 会按 agent instance 分别执行，并写 per-agent runtime report |
 | Run once / runtime failure semantics | Done | `solo run --once` 可推进一阶段；command runtime 失败会标记 phase/task failed |
+| Runtime wrapper contract | Done | default template 包含 wrapper contract 和 dummy runtime 示例 |
 
 当前新增能力：
 
