@@ -394,6 +394,12 @@ def available_adapters() -> list:
     return [PackageDispatcher.name, CommandDispatcher.name]
 
 
+def runtime_failed(package: Dict[str, Any]) -> bool:
+    """Return whether a package runtime ended in failure."""
+    runtime = package.get("runtime") or {}
+    return "returncode" in runtime and runtime["returncode"] != 0
+
+
 def phase_event_details(package: Dict[str, Any]) -> Dict[str, Any]:
     """Build a small event payload for dashboards and status readers."""
     details: Dict[str, Any] = {

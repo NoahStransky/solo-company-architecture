@@ -6,9 +6,9 @@ from typing import Any, Dict, Optional
 
 import click
 
-from solo.core.dispatcher import build_dispatcher, phase_event_details
+from solo.core.dispatcher import build_dispatcher, phase_event_details, runtime_failed
 from solo.core.project import SoloProject
-from solo.core.task import AGENT, AGENT_POOL, COMPLETED, HUMAN_GATE, IN_PROGRESS, PENDING, SKIPPED, SYSTEM, AgentInstance, PhaseResult, Task, TaskPhase, WorkPackage
+from solo.core.task import AGENT, AGENT_POOL, COMPLETED, FAILED, HUMAN_GATE, IN_PROGRESS, PENDING, SKIPPED, SYSTEM, AgentInstance, PhaseResult, Task, TaskPhase, WorkPackage
 from solo.utils.ui import print_json, success
 
 
@@ -21,6 +21,8 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
     phase = task.get_phase(phase_name or task.current_phase)
     if phase is None:
         raise click.ClickException(f"Phase not found: {phase_name or task.current_phase}")
+    if phase.status == FAILED:
+        raise click.ClickException(f"Phase is failed and cannot be completed without retry: {phase.name}")
 
     phase.status = COMPLETED
     _set_instances_for_phase(task, phase.name, COMPLETED)
@@ -78,13 +80,26 @@ def complete_task(project: SoloProject, task_id: Optional[str] = None, phase_nam
             adapter = config.get_execution_adapter_for_role(next_phase.role or next_phase.name)
             dispatcher = build_dispatcher(adapter, config, project.agents)
             package = dispatcher.prepare_phase(task, next_phase)
+        failed = bool(package and runtime_failed(package))
+        if failed:
+            next_phase.status = FAILED
+            task.status = FAILED
+            _set_instances_for_phase(task, next_phase.name, FAILED)
         project.state.append_event(
             "phase.started",
             task.id,
             phase=next_phase.name,
             details=phase_event_details(package) if package else None,
         )
-        _append_handoff_messages(project, task, phase, next_phase, package)
+        if failed:
+            project.state.append_event(
+                "phase.failed",
+                task.id,
+                phase=next_phase.name,
+                details=phase_event_details(package),
+            )
+        else:
+            _append_handoff_messages(project, task, phase, next_phase, package)
 
     task.touch()
     project.state.update_task(task)

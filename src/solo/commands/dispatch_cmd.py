@@ -6,10 +6,10 @@ from typing import Any, Dict, Optional
 
 import click
 
-from solo.core.dispatcher import build_dispatcher, phase_event_details
+from solo.core.dispatcher import build_dispatcher, phase_event_details, runtime_failed
 from solo.core.project import SoloProject
 from solo.core.secretary import Secretary
-from solo.core.task import AGENT, TaskPhase
+from solo.core.task import AGENT, FAILED, TaskPhase
 from solo.core.workflow import Workflow
 from solo.utils.ui import print_json, success
 
@@ -44,10 +44,19 @@ def dispatch_task(
     adapter = config.get_execution_adapter_for_role(phase.role or phase.name, override=adapter or "")
     dispatcher = build_dispatcher(adapter, config, project.agents)
     package = dispatcher.prepare_phase(task, phase)
+    failed = runtime_failed(package)
+    if failed:
+        task.status = FAILED
+        phase.status = FAILED
+        for instance in task.agent_instances:
+            if instance.phase == phase.name:
+                instance.status = FAILED
 
     project.state.add_task(task)
     project.state.append_event("task.created", task.id, phase=task.current_phase)
     project.state.append_event("phase.started", task.id, phase=task.current_phase, details=phase_event_details(package))
+    if failed:
+        project.state.append_event("phase.failed", task.id, phase=task.current_phase, details=phase_event_details(package))
     project.state.append_message(
         task.id,
         from_agent="ceo",

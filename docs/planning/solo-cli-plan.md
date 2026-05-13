@@ -552,6 +552,16 @@ Adapter 建议：
 - 新增 `{agent_instance}` command arg placeholder；runtime report 会写入 `dev-1_runtime.json` 等 per-agent 文件，并保留 phase aggregate runtime report。
 - 当前验证：`docker compose run --rm test` 通过，`33 passed`。
 
+#### 2026-05-13
+
+继续推进 run / runtime failure semantics：
+
+- 新增 `solo run --once`，作为当前 task 推进一阶段的入口；第一版复用 `complete_task`，后续再扩展 `--until` 和 retry/resume。
+- `dispatch` / `complete` 在 command runtime returncode 非 0 时，会把对应 phase 和 task 标记为 `failed`。
+- runtime 失败时写入 `phase.failed` event，并停止 handoff，避免失败 phase 继续交给下游 agent。
+- 已禁止直接 complete 一个 failed phase，后续需要通过 retry/reopen 机制恢复。
+- 当前验证：`docker compose run --rm test` 通过，`37 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -568,6 +578,7 @@ Adapter 建议：
 - Dev agent result 已能更新对应 work package status。
 - `solo validate` 已覆盖结构化 artifacts 的轻量 contract validation。
 - `command` adapter 已能按 agent pool instance 分别运行外部 runtime。
+- `solo run --once` 已成为推进当前 task 的统一入口；runtime 失败会落到 `failed` 状态和 `phase.failed` 事件。
 
 ### Progress Snapshot
 
@@ -592,6 +603,7 @@ Adapter 建议：
 | Work package status feedback | Done | dev result 会回填对应 work package status，并记录更新事件 |
 | Artifact contract validation | Done | `solo validate` 会检查 work packages、agent result、QA report 等 artifact |
 | Command adapter agent pool runtime | Done | command runtime 会按 agent instance 分别执行，并写 per-agent runtime report |
+| Run once / runtime failure semantics | Done | `solo run --once` 可推进一阶段；command runtime 失败会标记 phase/task failed |
 
 当前新增能力：
 

@@ -35,6 +35,7 @@ solo init --yes
 solo dispatch --workflow feature "Build RSS subscriptions"
 solo setup runtime local-codex --preset codex --for dev --for qa
 solo dispatch --adapter command --json "Run with an external runtime"
+solo run --once
 solo inspect --json
 solo complete
 solo status
@@ -175,6 +176,8 @@ For agent pool phases, the command adapter runs once per agent instance and pass
 
 Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runtime.json`; `events.jsonl` stores a lightweight pointer and return code for dashboards.
 
+Use `solo run --once` to advance the current task by one phase. If a command runtime returns a non-zero exit code, Solo marks the phase and task as `failed`, writes a `phase.failed` event, and does not hand off to the next agent.
+
 ## Protocol Validation
 
 Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, JSON/JSONL state files, and structured artifact contracts.
@@ -191,6 +194,7 @@ solo init
 solo dispatch
 solo inspect
 solo complete
+solo run
 solo status
 solo start
 solo setup runtime
