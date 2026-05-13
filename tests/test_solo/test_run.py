@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 
 from click.testing import CliRunner
+import pytest
 import yaml
 
 from solo.cli import main
@@ -133,3 +134,57 @@ def test_run_with_template_dummy_runtime_advances_multiple_phases():
         assert (artifact_dir / "dev-1_agent_result.json").exists()
         state = json.loads(Path(".solo/state/tasks.json").read_text())
         assert state["tasks"][0]["work_packages"][0]["status"] == "completed"
+
+
+@pytest.mark.xfail(strict=True, reason="solo run --until is not implemented yet")
+def test_run_until_qa_advances_until_requested_phase():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        config_path = Path(".solo/config.yaml")
+        config = yaml.safe_load(config_path.read_text())
+        dummy_runtime = str((Path.cwd() / ".solo/runtime/examples/dummy_runtime.py").resolve())
+        config["execution"]["default_adapter"] = "command"
+        config["execution"]["command"] = {
+            "command": sys.executable,
+            "args": [dummy_runtime],
+            "timeout": 30,
+            "env": {},
+        }
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        assert runner.invoke(main, ["dispatch", "--json", "Build run until qa flow"]).exit_code == 0
+
+        result = runner.invoke(main, ["run", "--until", "qa", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["task"]["status"] == "in_progress"
+        assert payload["task"]["current_phase"] == "qa"
+        assert [phase["status"] for phase in payload["task"]["phases"][:2]] == ["completed", "completed"]
+        assert payload["stopped_reason"] == "reached_phase"
+
+
+@pytest.mark.xfail(strict=True, reason="solo run --until is not implemented yet")
+def test_run_until_blocked_stops_on_runtime_failure():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        config_path = Path(".solo/config.yaml")
+        config = yaml.safe_load(config_path.read_text())
+        config["execution"]["default_adapter"] = "command"
+        config["execution"]["command"] = {
+            "command": sys.executable,
+            "args": ["-c", "import sys; sys.exit(11)"],
+            "timeout": 30,
+            "env": {},
+        }
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        assert runner.invoke(main, ["dispatch", "--json", "Build failing run until flow"]).exit_code == 0
+
+        result = runner.invoke(main, ["run", "--until", "blocked", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["task"]["status"] == "failed"
+        assert payload["stopped_reason"] == "failed"
+        assert payload["failed_phase"] == "cto_breakdown"

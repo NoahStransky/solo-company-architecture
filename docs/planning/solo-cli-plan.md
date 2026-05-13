@@ -568,6 +568,12 @@ Adapter 建议：
 - default template 新增 `.solo/runtime/examples/dummy_runtime.py`，可用于在没有真实 Codex/Claude/Hermes wrapper 时验证端到端 workflow。
 - 当前验证：`docker compose run --rm test` 通过，`38 passed`。
 
+继续推进 retry / reopen / run-until 测试规格：
+
+- 新增严格 xfail 测试，先定义未实现能力的验收线：`solo retry --phase`、`solo retry --agent`、`solo reopen --phase`、`solo run --until <phase>`、`solo run --until blocked`。
+- 这些测试不改变当前主线通过状态，但会在对应能力实现后要求移除 xfail 并转为正式回归测试。
+- 当前验证：`docker compose run --rm test` 通过，`38 passed, 5 xfailed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -586,6 +592,7 @@ Adapter 建议：
 - `command` adapter 已能按 agent pool instance 分别运行外部 runtime。
 - `solo run --once` 已成为推进当前 task 的统一入口；runtime 失败会落到 `failed` 状态和 `phase.failed` 事件。
 - default template 已包含 runtime wrapper contract 和 dummy runtime 示例。
+- retry / reopen / run-until 的测试规格已先行建立。
 
 ### Progress Snapshot
 
@@ -612,6 +619,7 @@ Adapter 建议：
 | Command adapter agent pool runtime | Done | command runtime 会按 agent instance 分别执行，并写 per-agent runtime report |
 | Run once / runtime failure semantics | Done | `solo run --once` 可推进一阶段；command runtime 失败会标记 phase/task failed |
 | Runtime wrapper contract | Done | default template 包含 wrapper contract 和 dummy runtime 示例 |
+| Retry / reopen / run-until specs | Test-first | 已创建严格 xfail 测试，作为下一阶段实现验收线 |
 
 当前新增能力：
 
