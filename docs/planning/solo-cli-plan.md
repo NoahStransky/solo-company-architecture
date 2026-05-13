@@ -545,6 +545,59 @@ Adapter 建议：
 - 不引入新依赖，先做协议必填字段和 QA verdict 枚举的轻量验证。
 - 当前验证：`docker compose run --rm test` 通过，`32 passed`。
 
+继续推进 command adapter agent pool runtime：
+
+- `command` adapter 在 agent pool phase 会按 agent instance 逐个调用 runtime。
+- 每个 runtime 调用会收到 `SOLO_AGENT_INSTANCE`，以及实例级 `SOLO_PACKAGE_INPUT` / `SOLO_PACKAGE_INSTRUCTION`。
+- 新增 `{agent_instance}` command arg placeholder；runtime report 会写入 `dev-1_runtime.json` 等 per-agent 文件，并保留 phase aggregate runtime report。
+- 当前验证：`docker compose run --rm test` 通过，`33 passed`。
+
+#### 2026-05-13
+
+继续推进 run / runtime failure semantics：
+
+- 新增 `solo run --once`，作为当前 task 推进一阶段的入口；第一版复用 `complete_task`，后续再扩展 `--until` 和 retry/resume。
+- `dispatch` / `complete` 在 command runtime returncode 非 0 时，会把对应 phase 和 task 标记为 `failed`。
+- runtime 失败时写入 `phase.failed` event，并停止 handoff，避免失败 phase 继续交给下游 agent。
+- 已禁止直接 complete 一个 failed phase，后续需要通过 retry/reopen 机制恢复。
+- 当前验证：`docker compose run --rm test` 通过，`37 passed`。
+
+继续推进 runtime wrapper contract：
+
+- default template 新增 `.solo/runtime/wrapper-contract.md`，明确 command adapter wrapper 可读环境变量、placeholder、必写 artifact 和 exit code 语义。
+- default template 新增 `.solo/runtime/examples/dummy_runtime.py`，可用于在没有真实 Codex/Claude/Hermes wrapper 时验证端到端 workflow。
+- 当前验证：`docker compose run --rm test` 通过，`38 passed`。
+
+继续推进 retry / reopen / run-until 测试规格：
+
+- 新增严格 xfail 测试，先定义未实现能力的验收线：`solo retry --phase`、`solo retry --agent`、`solo reopen --phase`、`solo run --until <phase>`、`solo run --until blocked`。
+- 这些测试不改变当前主线通过状态，但会在对应能力实现后要求移除 xfail 并转为正式回归测试。
+- 当前验证：`docker compose run --rm test` 通过，`38 passed, 5 xfailed`。
+
+继续补齐已有 CLI 命令测试覆盖：
+
+- 新增命令级测试，覆盖所有 project command 在非 `.solo` 项目内的报错、CLI help 命令列表、`solo start` 交互 loop、`solo status --all`、`solo inspect` / `solo complete` 错误路径。
+- 扩展 `solo init`、`solo dispatch`、`solo setup runtime` 测试，覆盖 description、未知 template、未知 workflow/adapter/role、package preset、invalid env、empty command profile。
+- 修复 `solo dispatch --to <missing-role>` 和未知 workflow 的错误处理，避免内部异常泄漏到 CLI。
+- 当前验证：`docker compose run --rm test` 通过，`55 passed, 5 xfailed`。
+
+继续研究 runtime orchestration 下一层：
+
+- 记录到 `docs/research/solo-cli-research.md`：下一阶段应先抽 `PhaseRunner` / `RunLoop` / `RecoveryService`，而不是立即增加专用 Hermes/Codex/Claude adapter。
+- 明确 `run --until`、`reopen`、`retry --phase`、`retry --agent` 的状态语义和建议事件。
+- 识别 agent pool 当前风险：per-instance package 已完成，但 runtime 仍是串行；失败时需要先按 instance 更新状态，才能支持 agent-level retry。
+- 推荐顺序：先 runner/refactor，再 `run --until`，再 `reopen/retry`，最后做 bounded parallel execution。
+
+继续实现 runtime orchestration：
+
+- 新增 `solo.core.runner`，集中管理 phase complete、phase prepare、run loop、reopen、retry phase、retry agent 的状态语义。
+- `solo run` 新增 `--until <phase|blocked|done>`，并保留 `--once` 单步推进。
+- 新增 `solo reopen --phase`、`solo retry --phase`、`solo retry --agent` 命令。
+- command adapter 的 agent pool runtime 改为 bounded parallel execution，并使用 `delegation.max_parallel_dev_agents` 控制并发。
+- agent pool runtime 失败时会按 instance returncode 更新 agent instance 状态，支持只重试失败 agent。
+- 原先 5 个 strict xfail 验收测试已转为正式回归测试。
+- 当前验证：`docker compose run --rm test` 通过，`62 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -560,6 +613,13 @@ Adapter 建议：
 - Agent pool 已生成 per-instance execution package，mailbox 可以把 `dev-1/dev-2/...` 路由到各自 instruction。
 - Dev agent result 已能更新对应 work package status。
 - `solo validate` 已覆盖结构化 artifacts 的轻量 contract validation。
+- `command` adapter 已能按 agent pool instance 分别运行外部 runtime。
+- `solo run --once` 已成为推进当前 task 的统一入口；runtime 失败会落到 `failed` 状态和 `phase.failed` 事件。
+- default template 已包含 runtime wrapper contract 和 dummy runtime 示例。
+- retry / reopen / run-until 的测试规格已先行建立。
+- 已有 CLI commands 的项目边界、交互入口、错误路径和 setup runtime 分支已补测试覆盖。
+- runtime orchestration 下一层已完成研究记录，下一步实现优先级是 runner/refactor 与 `run --until`。
+- runtime orchestration 已完成第一版：`run --until`、`reopen`、`retry phase`、`retry agent`、agent pool 部分失败状态和 bounded parallel execution 均已落地。
 
 ### Progress Snapshot
 
@@ -583,6 +643,13 @@ Adapter 建议：
 | Agent pool per-instance packages | Done | dev pool 会生成每个 agent instance 的 input/instruction，并写入 mailbox handoff |
 | Work package status feedback | Done | dev result 会回填对应 work package status，并记录更新事件 |
 | Artifact contract validation | Done | `solo validate` 会检查 work packages、agent result、QA report 等 artifact |
+| Command adapter agent pool runtime | Done | command runtime 会按 agent instance 分别执行，并写 per-agent runtime report |
+| Run once / runtime failure semantics | Done | `solo run --once` 可推进一阶段；command runtime 失败会标记 phase/task failed |
+| Runtime wrapper contract | Done | default template 包含 wrapper contract 和 dummy runtime 示例 |
+| Retry / reopen / run-until specs | Done | 原严格 xfail 测试已转为正式回归测试 |
+| CLI command coverage | Done | 已补齐已有命令的 project boundary、help、start/status/inspect/complete/setup 错误路径测试 |
+| Runtime orchestration research | Done | 已明确 runner/recovery/run-loop 设计和并行 agent pool 的实现顺序 |
+| Runtime orchestration implementation | Done | 已实现 `solo.core.runner`、`run --until`、`reopen`、`retry`、agent pool 部分失败和 bounded parallel execution |
 
 当前新增能力：
 
@@ -748,6 +815,18 @@ tests/test_solo/
 ---
 
 ## 十一、推荐下一步
+
+最新推荐实现顺序：
+
+1. 抽 `solo.core.runner`，把 `complete_task` 内的 phase 推进、adapter 调用、failure 处理拆到可复用服务。
+2. 实现 `solo run --until <phase|blocked|done>`，移除对应 strict xfail。
+3. 实现 `solo reopen --phase`，支持不运行 runtime 的失败恢复。
+4. 实现 `solo retry --phase`，复用 reopen + run-once。
+5. 改进 agent pool 部分失败状态，按 instance returncode 更新 agent instance。
+6. 实现 `solo retry --agent`。
+7. 在 command adapter 内加入 bounded parallel execution，使用 `delegation.max_parallel_dev_agents` 控制并发。
+
+旧 MVP 闭环仍然保持：
 
 当前 MVP 闭环：
 

@@ -427,3 +427,108 @@ solo-company-cli/
 3. **并发写入** — `solo start`、`solo dispatch`、未来 `solo-os dispatch` 可能同时改状态。需要文件锁或事件日志优先的合并策略。
 4. **config 与 pi 的兼容性** — 用户可能同时用 pi 和 solo，注意避免 `.pi/` 和 `.solo/` 配置冲突（使用不同目录名即可避免）。
 5. **多 provider API key 管理** — 类似 pi 的 `auth.json`，solo 需要安全存储不同 provider 的 API keys；MVP 可以先只读环境变量。
+
+---
+
+## 五、2026-05-13 追加研究: runtime orchestration 下一层
+
+当前代码已经完成 `.solo/` 协议、执行包、runtime profile、durable mailbox、结构化 artifact 回流和 Docker 测试环境。下一步不应该直接写 Hermes/Codex/Claude Code 专用 adapter，而应该把“如何运行一个 phase、如何恢复失败、如何推进到目标 phase”抽成稳定的 orchestration 层。
+
+### 5.1 当前实现的能力边界
+
+已具备：
+
+- `solo dispatch` 创建 task，并生成当前 phase 的 package。
+- `solo complete` / `solo run --once` 可推进一个 phase。
+- `package` adapter 负责生成 instruction/input。
+- `command` adapter 可调用外部 wrapper。
+- agent pool 已生成 per-instance package：`dev-1_input.json`、`dev-1_instruction.md` 等。
+- mailbox 已能按实例路由：`cto -> dev-1/dev-2`、`dev-1/dev-2 -> qa`。
+- runtime returncode 非 0 时，phase/task 会进入 `failed`。
+
+尚未具备：
+
+- `solo run --until <phase|blocked|done>` 的循环推进。
+- `solo retry --phase`、`solo retry --agent`、`solo reopen --phase` 的恢复语义。
+- 真正并行执行 agent pool；当前 command adapter 是逐个 instance 调用。
+- agent pool 的部分失败语义；当前 phase 失败时会把该 phase 下所有 agent instance 标为 failed，不利于只重试失败 agent。
+
+### 5.2 建议抽出的核心概念
+
+应新增一个 core 层，比如 `solo.core.runner`，把命令层从状态推进细节中解耦出来：
+
+| 概念 | 责任 |
+|------|------|
+| `PhaseRunner` | 运行或准备当前 phase，调用 adapter，写 runtime details |
+| `PhaseAdvancer` | 完成当前 phase、选择下一 phase、处理 optional human gate |
+| `RecoveryService` | reopen/retry phase 或 agent instance，写恢复事件 |
+| `RunLoop` | 实现 `run --once` / `run --until` / stop condition |
+
+这样命令层只负责参数解析和 JSON/text 输出，`complete_cmd.py` 不会继续变成所有生命周期逻辑的中心。
+
+### 5.3 run-until 的语义建议
+
+`solo run --until` 应支持三类目标：
+
+| 目标 | 停止条件 |
+|------|----------|
+| `<phase>` | task.current_phase 等于目标 phase，且目标 phase 已准备好 |
+| `blocked` | 任一 phase/runtime 失败，task.status 为 `failed` |
+| `done` | task.status 为 `completed` |
+
+输出建议：
+
+```json
+{
+  "task": {},
+  "stopped_reason": "reached_phase | failed | completed | no_progress",
+  "completed_phases": ["cto_breakdown", "dev_pool"],
+  "failed_phase": "",
+  "last_package": {}
+}
+```
+
+`run --once` 可以成为 `run --until` 的一个特例：最多推进一次。
+
+### 5.4 retry / reopen 的语义建议
+
+`reopen` 和 `retry` 要分开：
+
+| 命令 | 是否运行 runtime | 状态效果 |
+|------|------------------|----------|
+| `solo reopen --phase dev_pool` | 否 | 把 failed phase 和对应 instances 重置为 `in_progress`，task 回到该 phase |
+| `solo retry --phase dev_pool` | 是 | reopen 后立即重新运行该 phase；成功则推进下一 phase |
+| `solo retry --agent dev-1` | 是 | 只重跑目标 agent instance，不重跑同 phase 的成功 instance |
+
+事件建议：
+
+- `phase.reopened`
+- `phase.retried`
+- `agent.retried`
+- `agent.completed`
+- `agent.failed`
+
+### 5.5 agent pool 并行执行建议
+
+第一版并行不要引入复杂队列，使用 bounded thread pool 即可：
+
+- 并发上限来自 `delegation.max_parallel_dev_agents`。
+- 每个 agent instance 独立调用 command runtime。
+- 每个 instance 写自己的 `<agent_id>_runtime.json`。
+- phase aggregate runtime 写 `<phase>_runtime.json`。
+- phase 是否失败取决于任一 required instance 失败。
+- instance status 必须按自身 returncode 更新，不能一刀切。
+
+这会让 `solo-os` dashboard 能看到具体是 `dev-1` 失败还是整个 phase 失败，也为后续 `retry --agent dev-1` 提供状态基础。
+
+### 5.6 下一步推荐顺序
+
+1. 先抽 `PhaseRunner` / `RunLoop`，保持现有测试通过。
+2. 实现 `solo run --until`，让已有 strict xfail 测试转正。
+3. 实现 `solo reopen --phase`。
+4. 实现 `solo retry --phase`。
+5. 实现 agent pool 部分失败状态。
+6. 实现 `solo retry --agent`。
+7. 最后再把 agent pool command runtime 改成 bounded parallel execution。
+
+这个顺序的好处是每一步都有明确测试边界，而且不会先引入真正并发导致调试面扩大。

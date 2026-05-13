@@ -23,6 +23,8 @@ def test_init_creates_solo_protocol_files():
         assert Path(".solo/contracts/agent_result.schema.json").exists()
         assert Path(".solo/contracts/qa_report.schema.json").exists()
         assert Path(".solo/contracts/message.schema.json").exists()
+        assert Path(".solo/runtime/wrapper-contract.md").exists()
+        assert Path(".solo/runtime/examples/dummy_runtime.py").exists()
         assert Path(".solo/artifacts").is_dir()
         assert Path(".soloignore").exists()
 
@@ -43,3 +45,21 @@ def test_init_refuses_existing_solo_dir():
         assert first.exit_code == 0
         assert second.exit_code != 0
         assert "already exists" in second.output
+
+
+def test_init_sets_description_and_rejects_unknown_template():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["init", "--yes", "--name", "described", "--description", "Solo test project"])
+
+        assert result.exit_code == 0, result.output
+        project = SoloProject.find(Path.cwd())
+        assert project is not None
+        assert project.require_config().project.name == "described"
+        assert project.require_config().project.description == "Solo test project"
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["init", "--template", "missing", "--yes"])
+
+        assert result.exit_code != 0
+        assert "Unknown template: missing" in result.output

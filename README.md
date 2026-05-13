@@ -35,6 +35,7 @@ solo init --yes
 solo dispatch --workflow feature "Build RSS subscriptions"
 solo setup runtime local-codex --preset codex --for dev --for qa
 solo dispatch --adapter command --json "Run with an external runtime"
+solo run --once
 solo inspect --json
 solo complete
 solo status
@@ -169,9 +170,15 @@ solo setup runtime local-codex --preset codex --for dev --for qa
 solo setup runtime local-wrapper --command ./scripts/solo-runtime --arg "{instruction}" --set-default
 ```
 
-The generic `command` adapter can hand the prepared package to Hermes, OpenClaw, Codex, Claude Code, or a local wrapper script. `command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
+The generic `command` adapter can hand the prepared package to Hermes, OpenClaw, Codex, Claude Code, or a local wrapper script. `command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{agent_instance}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_AGENT_INSTANCE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
+
+For agent pool phases, the command adapter runs once per agent instance and passes the instance-specific package paths, such as `dev-1_input.json` and `dev-1_instruction.md`. Runtime reports are written per agent, plus an aggregate phase runtime report.
 
 Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runtime.json`; `events.jsonl` stores a lightweight pointer and return code for dashboards.
+
+Use `solo run --once` to advance the current task by one phase. If a command runtime returns a non-zero exit code, Solo marks the phase and task as `failed`, writes a `phase.failed` event, and does not hand off to the next agent.
+
+New projects include `.solo/runtime/wrapper-contract.md` and `.solo/runtime/examples/dummy_runtime.py`. The dummy runtime is useful for checking the end-to-end workflow before wiring a real external agent CLI.
 
 ## Protocol Validation
 
@@ -189,6 +196,7 @@ solo init
 solo dispatch
 solo inspect
 solo complete
+solo run
 solo status
 solo start
 solo setup runtime

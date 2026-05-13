@@ -7,6 +7,9 @@ from .commands.complete_cmd import complete
 from .commands.dispatch_cmd import dispatch
 from .commands.inspect_cmd import inspect
 from .commands.init_cmd import init
+from .commands.reopen_cmd import reopen
+from .commands.retry_cmd import retry
+from .commands.run_cmd import run
 from .commands.setup_cmd import setup
 from .commands.start_cmd import start
 from .commands.status_cmd import status
@@ -23,6 +26,9 @@ main.add_command(init)
 main.add_command(dispatch)
 main.add_command(inspect)
 main.add_command(complete)
+main.add_command(reopen)
+main.add_command(retry)
+main.add_command(run)
 main.add_command(status)
 main.add_command(start)
 main.add_command(setup)
