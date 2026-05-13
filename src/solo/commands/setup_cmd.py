@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Optional
 
 import click
 
-from solo.core.config import CommandRuntimeConfig, RuntimeProfileConfig, save_config
+from solo.core.config import AgentConfig, CommandRuntimeConfig, MCPServerConfig, ProviderConfig, RuntimeProfileConfig, SkillConfig, save_config
 from solo.core.project import SoloProject
 from solo.utils.ui import success
 
@@ -106,6 +106,128 @@ def setup_runtime(
         click.echo(f"{role} runtime: {name}")
 
 
+@setup.command("agent")
+@click.argument("role")
+@click.option("--provider", default=None, help="Provider name for this agent.")
+@click.option("--model", default=None, help="Model name for this agent.")
+@click.option("--runtime", default=None, help="Runtime profile name for this agent.")
+@click.option("--temperature", type=float, default=None, help="Sampling temperature.")
+@click.option("--max-tokens", type=int, default=None, help="Max output tokens.")
+@click.option("--skill", "skills", multiple=True, help="Skill name. Repeat to replace the skill list.")
+@click.option("--mcp", "mcp_servers", multiple=True, help="MCP server name. Repeat to replace the MCP list.")
+@click.option("--tool", "tools", multiple=True, help="Tool name. Repeat to replace the tool list.")
+def setup_agent(
+    role: str,
+    provider: Optional[str],
+    model: Optional[str],
+    runtime: Optional[str],
+    temperature: Optional[float],
+    max_tokens: Optional[int],
+    skills: Iterable[str],
+    mcp_servers: Iterable[str],
+    tools: Iterable[str],
+):
+    """Create or update one agent role in .solo/config.yaml."""
+    project = _require_project()
+    config = project.require_config()
+    existing = config.agents.get(role) or AgentConfig(provider="", model="")
+    if provider and provider not in config.providers:
+        raise click.ClickException(f"Unknown provider: {provider}")
+    if runtime and runtime not in config.runtime_profiles:
+        raise click.ClickException(f"Unknown runtime profile: {runtime}")
+    for skill in skills:
+        if skill not in config.skills:
+            raise click.ClickException(f"Unknown skill: {skill}")
+    for server in mcp_servers:
+        if server not in config.mcp_servers:
+            raise click.ClickException(f"Unknown MCP server: {server}")
+    config.agents[role] = AgentConfig(
+        provider=provider if provider is not None else existing.provider,
+        model=model if model is not None else existing.model,
+        runtime=runtime if runtime is not None else existing.runtime,
+        temperature=temperature if temperature is not None else existing.temperature,
+        max_tokens=max_tokens if max_tokens is not None else existing.max_tokens,
+        skills=list(skills) if skills else list(existing.skills),
+        mcp_servers=list(mcp_servers) if mcp_servers else list(existing.mcp_servers),
+        tools=list(tools) if tools else list(existing.tools),
+    )
+    save_config(config, project.config_path)
+    success(f"saved agent {role}")
+
+
+@setup.command("provider")
+@click.argument("name")
+@click.option("--type", "provider_type", required=True, help="Provider type, e.g. openai, anthropic, openai-compatible.")
+@click.option("--api-key-env", default="", help="Environment variable containing the API key.")
+@click.option("--base-url", default="", help="Provider base URL.")
+@click.option("--organization-env", default="", help="Environment variable containing the organization id.")
+def setup_provider(
+    name: str,
+    provider_type: str,
+    api_key_env: str,
+    base_url: str,
+    organization_env: str,
+):
+    """Create or update a provider config."""
+    project = _require_project()
+    config = project.require_config()
+    config.providers[name] = ProviderConfig(
+        type=provider_type,
+        api_key_env=api_key_env,
+        base_url=base_url,
+        organization_env=organization_env,
+    )
+    save_config(config, project.config_path)
+    success(f"saved provider {name}")
+
+
+@setup.command("mcp")
+@click.argument("name")
+@click.option("--command", "command_name", required=True, help="MCP server command.")
+@click.option("--arg", "args", multiple=True, help="MCP server argument. Repeat for multiple args.")
+@click.option("--env", "env_items", multiple=True, help="Environment entry as KEY=VALUE. Repeat for multiple entries.")
+@click.option("--description", default="", help="MCP server description.")
+@click.option("--enable/--disable", default=True, help="Enable or disable this MCP server.")
+def setup_mcp(
+    name: str,
+    command_name: str,
+    args: Iterable[str],
+    env_items: Iterable[str],
+    description: str,
+    enable: bool,
+):
+    """Create or update an MCP server config."""
+    project = _require_project()
+    config = project.require_config()
+    config.mcp_servers[name] = MCPServerConfig(
+        command=command_name,
+        args=list(args),
+        env=_parse_env(env_items),
+        enabled=enable,
+        description=description,
+    )
+    save_config(config, project.config_path)
+    success(f"saved mcp server {name}")
+
+
+@setup.command("skill")
+@click.argument("name")
+@click.option("--path", "skill_path", required=True, help="Skill file path relative to .solo.")
+@click.option("--description", default="", help="Skill description.")
+@click.option("--create-file", is_flag=True, help="Create the skill file if it does not exist.")
+def setup_skill(name: str, skill_path: str, description: str, create_file: bool):
+    """Create or update a skill config."""
+    project = _require_project()
+    config = project.require_config()
+    config.skills[name] = SkillConfig(description=description, path=skill_path)
+    target = project.solo_dir / skill_path
+    if create_file and not target.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f"# {name}\n\n{description}\n", encoding="utf-8")
+    save_config(config, project.config_path)
+    success(f"saved skill {name}")
+
+
 def _parse_env(items: Iterable[str]) -> Dict[str, str]:
     env: Dict[str, str] = {}
     for item in items:
@@ -116,3 +238,10 @@ def _parse_env(items: Iterable[str]) -> Dict[str, str]:
             raise click.ClickException(f"Invalid --env value, expected KEY=VALUE: {item}")
         env[key] = value
     return env
+
+
+def _require_project() -> SoloProject:
+    project = SoloProject.find(Path.cwd())
+    if project is None:
+        raise click.ClickException("No .solo project found. Run solo init first.")
+    return project

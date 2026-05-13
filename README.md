@@ -33,8 +33,6 @@ docker compose run --rm cli status --json
 ```bash
 solo init --yes
 solo dispatch --workflow feature "Build RSS subscriptions"
-solo setup runtime local-codex --preset codex --for dev --for qa
-solo dispatch --adapter command --json "Run with an external runtime"
 solo run --once
 solo inspect --json
 solo complete
@@ -43,6 +41,30 @@ solo status --json
 solo validate --json
 solo start
 ```
+
+## End-To-End Dummy Runtime Demo
+
+New projects include a local dummy runtime that writes valid Solo artifacts without calling a real model. This is the fastest way to check the whole workflow.
+
+```bash
+solo init --yes --name demo-company
+solo setup runtime dummy \
+  --command python \
+  --arg .solo/runtime/examples/dummy_runtime.py \
+  --set-default
+solo dispatch --json "Build a small RSS subscription feature"
+solo run --until done --json
+solo status --json
+solo inspect --json
+solo validate --json
+```
+
+Expected result:
+
+- `solo run --until done` advances through CTO breakdown, dev pool, QA, CTO review, and secretary report.
+- `.solo/artifacts/<task_id>/` contains instruction/input files, runtime reports, work packages, dev results, QA report, and the final report.
+- `solo status --json` includes stable `dashboard.tasks[*]` cards with phase progress, agent progress, work package progress, and failed reason fields.
+- `solo inspect --json` includes the same dashboard summary plus full events, messages, and artifact manifest for one task.
 
 ## Project Protocol
 
@@ -62,7 +84,7 @@ After `solo init`, a project has:
 └── contracts/
 ```
 
-`solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, `state/messages.jsonl`, and call `solo status --json` or `solo dispatch --json` when it needs structured interaction. `solo status --json` also exposes project paths and execution adapter capabilities for dashboard registration.
+`solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, `state/messages.jsonl`, and call `solo status --json` or `solo dispatch --json` when it needs structured interaction. `solo status --json` also exposes project paths, execution adapter capabilities, phase progress, agent progress, work package progress, and failed reason fields for dashboard registration.
 
 ## Runtime Shape
 
@@ -170,6 +192,34 @@ solo setup runtime local-codex --preset codex --for dev --for qa
 solo setup runtime local-wrapper --command ./scripts/solo-runtime --arg "{instruction}" --set-default
 ```
 
+Other common configuration can also be managed without editing YAML by hand:
+
+```bash
+solo setup provider local-openai \
+  --type openai-compatible \
+  --api-key-env LOCAL_API_KEY \
+  --base-url http://localhost:11434/v1
+
+solo setup mcp local-files \
+  --command npx \
+  --arg=-y \
+  --arg=@modelcontextprotocol/server-filesystem \
+  --arg . \
+  --enable
+
+solo setup skill debugging \
+  --path skills/debugging.md \
+  --description "Debug failing tests" \
+  --create-file
+
+solo setup agent dev \
+  --provider local-openai \
+  --model qwen-coder \
+  --skill implementation \
+  --skill testing \
+  --mcp local-files
+```
+
 The generic `command` adapter can hand the prepared package to Hermes, OpenClaw, Codex, Claude Code, or a local wrapper script. `command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{agent_instance}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_AGENT_INSTANCE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
 
 For agent pool phases, the command adapter runs once per agent instance and passes the instance-specific package paths, such as `dev-1_input.json` and `dev-1_instruction.md`. Runtime reports are written per agent, plus an aggregate phase runtime report.
@@ -178,11 +228,20 @@ Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runt
 
 Use `solo run --once` to advance the current task by one phase. If a command runtime returns a non-zero exit code, Solo marks the phase and task as `failed`, writes a `phase.failed` event, and does not hand off to the next agent.
 
-New projects include `.solo/runtime/wrapper-contract.md` and `.solo/runtime/examples/dummy_runtime.py`. The dummy runtime is useful for checking the end-to-end workflow before wiring a real external agent CLI.
+New projects include `.solo/runtime/wrapper-contract.md`, `.solo/runtime/examples/dummy_runtime.py`, and `.solo/runtime/examples/cli_wrapper.py`. The dummy runtime is useful for checking the end-to-end workflow before wiring a real external agent CLI. The generic CLI wrapper sends the Solo instruction to an external command on stdin and writes a structured Solo result:
+
+```bash
+solo setup runtime generic-cli \
+  --command python \
+  --arg .solo/runtime/examples/cli_wrapper.py \
+  --arg=-- \
+  --arg your-agent-cli \
+  --set-default
+```
 
 ## Protocol Validation
 
-Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, JSON/JSONL state files, and structured artifact contracts.
+Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, JSON/JSONL state files, message pointers, phase/task consistency, runtime reports, and structured artifact contracts.
 
 ```bash
 solo validate
@@ -196,10 +255,16 @@ solo init
 solo dispatch
 solo inspect
 solo complete
+solo reopen
+solo retry
 solo run
 solo status
 solo start
 solo setup runtime
+solo setup agent
+solo setup provider
+solo setup mcp
+solo setup skill
 solo validate
 ```
 

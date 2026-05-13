@@ -598,6 +598,15 @@ Adapter 建议：
 - 原先 5 个 strict xfail 验收测试已转为正式回归测试。
 - 当前验证：`docker compose run --rm test` 通过，`62 passed`。
 
+继续打磨 dashboard / validate / setup / runtime wrapper：
+
+- 新增 `solo.core.dashboard`，为 `solo status --json` 和 `solo inspect --json` 提供稳定 dashboard 字段：phase progress、agent progress、work package progress、failed reason。
+- `solo validate` 增强到 message pointers、runtime reports、task/phase/agent/work package consistency，不再只检查基础文件和 artifact contract。
+- `solo setup` 新增 `agent`、`provider`、`mcp`、`skill` 子命令，常见配置可通过 CLI 管理，不必手改 YAML。
+- default template 新增 `.solo/runtime/examples/cli_wrapper.py`，作为通用外部 CLI wrapper 示例。
+- README 新增从 `solo init` 到 dummy runtime `solo run --until done` 的完整 demo。
+- 当前验证：`docker compose run --rm test` 通过，`67 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -620,6 +629,7 @@ Adapter 建议：
 - 已有 CLI commands 的项目边界、交互入口、错误路径和 setup runtime 分支已补测试覆盖。
 - runtime orchestration 下一层已完成研究记录，下一步实现优先级是 runner/refactor 与 `run --until`。
 - runtime orchestration 已完成第一版：`run --until`、`reopen`、`retry phase`、`retry agent`、agent pool 部分失败状态和 bounded parallel execution 均已落地。
+- dashboard JSON、协议验证、setup 配置入口、通用 CLI wrapper 示例和 README 完整 demo 已补齐。
 
 ### Progress Snapshot
 
@@ -650,6 +660,11 @@ Adapter 建议：
 | CLI command coverage | Done | 已补齐已有命令的 project boundary、help、start/status/inspect/complete/setup 错误路径测试 |
 | Runtime orchestration research | Done | 已明确 runner/recovery/run-loop 设计和并行 agent pool 的实现顺序 |
 | Runtime orchestration implementation | Done | 已实现 `solo.core.runner`、`run --until`、`reopen`、`retry`、agent pool 部分失败和 bounded parallel execution |
+| Dashboard JSON fields | Done | `status --json` / `inspect --json` 输出 phase/agent/work package progress 和 failed reason |
+| Validate consistency checks | Done | `solo validate` 覆盖 messages、runtime reports、phase/task/agent/work package consistency |
+| Setup config commands | Done | `solo setup agent/provider/mcp/skill` 可管理常见配置 |
+| Generic CLI wrapper example | Done | default template 包含 `runtime/examples/cli_wrapper.py` |
+| README end-to-end demo | Done | README 展示 dummy runtime 从 init 到 `run --until done` 的完整路径 |
 
 当前新增能力：
 

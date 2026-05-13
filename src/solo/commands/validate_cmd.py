@@ -9,6 +9,7 @@ import click
 from solo.core.config import SoloConfig
 from solo.core.dispatcher import available_adapters
 from solo.core.project import SoloProject
+from solo.core.task import COMPLETED, FAILED, IN_PROGRESS, PENDING, SKIPPED
 from solo.core.workflow import Workflow
 from solo.utils.ui import print_json, success
 
@@ -32,7 +33,10 @@ def validate_project(project: SoloProject) -> Dict[str, Any]:
     _check_config(project, config, errors, warnings)
     _check_workflows(project, config, errors, warnings)
     _check_state_files(project, errors)
+    _check_state_consistency(project, errors, warnings)
+    _check_messages(project, errors)
     _check_artifact_contracts(project, errors)
+    _check_runtime_reports(project, errors)
 
     return {
         "ok": not errors,
@@ -161,6 +165,54 @@ def _check_state_files(project: SoloProject, errors: List[Dict[str, str]]) -> No
     _check_jsonl(project.state.messages_file, "invalid_message_log", errors)
 
 
+def _check_state_consistency(
+    project: SoloProject,
+    errors: List[Dict[str, str]],
+    warnings: List[Dict[str, str]],
+) -> None:
+    try:
+        tasks = project.state.load_tasks()
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return
+    valid_statuses = {PENDING, IN_PROGRESS, "blocked", "waiting_approval", COMPLETED, FAILED, SKIPPED}
+    for task in tasks:
+        phase_names = {phase.name for phase in task.phases}
+        if task.status not in valid_statuses:
+            errors.append(_issue("invalid_task_status", f"Task {task.id} has invalid status: {task.status}", project.state.tasks_file))
+        if task.status == COMPLETED:
+            if task.current_phase:
+                errors.append(_issue("completed_task_has_current_phase", f"Completed task {task.id} still has current_phase: {task.current_phase}", project.state.tasks_file))
+        elif task.current_phase not in phase_names:
+            errors.append(_issue("missing_current_phase", f"Task {task.id} current_phase is not in phases: {task.current_phase}", project.state.tasks_file))
+        failed_phases = [phase.name for phase in task.phases if phase.status == FAILED]
+        if task.status == FAILED and not failed_phases:
+            errors.append(_issue("failed_task_without_failed_phase", f"Task {task.id} is failed but no phase is failed", project.state.tasks_file))
+        if task.status != FAILED and failed_phases:
+            errors.append(_issue("failed_phase_without_failed_task", f"Task {task.id} has failed phases but task is {task.status}", project.state.tasks_file))
+
+        for phase in task.phases:
+            if phase.status not in valid_statuses:
+                errors.append(_issue("invalid_phase_status", f"Task {task.id} phase {phase.name} has invalid status: {phase.status}", project.state.tasks_file))
+            for dependency in phase.depends_on:
+                dependency_phase = task.get_phase(dependency)
+                if dependency_phase is None:
+                    errors.append(_issue("missing_task_phase_dependency", f"Task {task.id} phase {phase.name} depends on missing phase: {dependency}", project.state.tasks_file))
+                elif phase.status in {IN_PROGRESS, COMPLETED, FAILED} and dependency_phase.status not in {COMPLETED, SKIPPED}:
+                    errors.append(_issue("unsatisfied_phase_dependency", f"Task {task.id} phase {phase.name} started before dependency {dependency} completed", project.state.tasks_file))
+
+        instance_ids = {instance.id for instance in task.agent_instances}
+        for instance in task.agent_instances:
+            if instance.status not in valid_statuses:
+                errors.append(_issue("invalid_agent_instance_status", f"Task {task.id} agent {instance.id} has invalid status: {instance.status}", project.state.tasks_file))
+            if instance.phase and instance.phase not in phase_names:
+                errors.append(_issue("agent_instance_missing_phase", f"Task {task.id} agent {instance.id} references missing phase: {instance.phase}", project.state.tasks_file))
+        for package in task.work_packages:
+            if package.agent_instance and package.agent_instance not in instance_ids:
+                errors.append(_issue("work_package_missing_agent", f"Task {task.id} work package {package.id} references missing agent: {package.agent_instance}", project.state.tasks_file))
+        if not Path(task.artifacts_dir).exists():
+            warnings.append(_issue("missing_task_artifacts_dir", f"Task {task.id} artifacts directory is missing", Path(task.artifacts_dir)))
+
+
 def _check_jsonl(path: Path, code: str, errors: List[Dict[str, str]]) -> None:
     if not path.exists():
         return
@@ -173,6 +225,33 @@ def _check_jsonl(path: Path, code: str, errors: List[Dict[str, str]]) -> None:
                 json.loads(line)
             except json.JSONDecodeError as exc:
                 errors.append(_issue(code, f"Invalid JSONL at line {line_number}: {exc}", path))
+
+
+def _check_messages(project: SoloProject, errors: List[Dict[str, str]]) -> None:
+    try:
+        tasks = project.state.load_tasks()
+        messages = project.state.load_messages()
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return
+    tasks_by_id = {task.id: task for task in tasks}
+    for index, message in enumerate(messages, start=1):
+        missing = [key for key in ("task_id", "from", "to", "type") if not str(message.get(key, "")).strip()]
+        if missing:
+            errors.append(_issue("invalid_message", f"Message #{index} is missing: {', '.join(missing)}", project.state.messages_file))
+            continue
+        task = tasks_by_id.get(message["task_id"])
+        if task is None:
+            errors.append(_issue("message_unknown_task", f"Message #{index} references unknown task: {message['task_id']}", project.state.messages_file))
+        elif message.get("phase") and message["phase"] not in {phase.name for phase in task.phases}:
+            errors.append(_issue("message_unknown_phase", f"Message #{index} references unknown phase: {message['phase']}", project.state.messages_file))
+        artifact = str(message.get("artifact", "")).strip()
+        if artifact and not Path(artifact).exists():
+            errors.append(_issue("message_missing_artifact", f"Message #{index} artifact does not exist: {artifact}", project.state.messages_file))
+        details = message.get("details") or {}
+        for key in ("next_instruction", "next_input"):
+            path = str(details.get(key, "")).strip()
+            if path and not Path(path).exists():
+                errors.append(_issue("message_missing_detail_artifact", f"Message #{index} details.{key} does not exist: {path}", project.state.messages_file))
 
 
 def _check_artifact_contracts(project: SoloProject, errors: List[Dict[str, str]]) -> None:
@@ -198,6 +277,27 @@ def _check_artifact_contracts(project: SoloProject, errors: List[Dict[str, str]]
                 payload = _load_json_artifact(path, errors)
                 if payload is not None:
                     _validate_agent_result_payload(payload, path, errors)
+
+
+def _check_runtime_reports(project: SoloProject, errors: List[Dict[str, str]]) -> None:
+    try:
+        tasks = project.state.load_tasks()
+        events = project.state.load_events()
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return
+    for task in tasks:
+        artifact_dir = Path(task.artifacts_dir)
+        if not artifact_dir.exists():
+            continue
+        for path in sorted(item for item in artifact_dir.rglob("*_runtime.json") if item.is_file()):
+            payload = _load_json_artifact(path, errors)
+            if payload is not None:
+                _validate_runtime_payload(payload, path, errors)
+    for index, event in enumerate(events, start=1):
+        details = event.get("details") or {}
+        runtime_report = str(details.get("runtime_report", "")).strip()
+        if runtime_report and not Path(runtime_report).exists():
+            errors.append(_issue("event_missing_runtime_report", f"Event #{index} runtime_report does not exist: {runtime_report}", project.state.events_file))
 
 
 def _load_json_artifact(path: Path, errors: List[Dict[str, str]]) -> Any:
@@ -257,6 +357,34 @@ def _validate_qa_report_payload(payload: Any, path: Path, errors: List[Dict[str,
     verdict = str(payload.get("verdict", "")).strip()
     if verdict not in QA_VERDICTS:
         errors.append(_issue("invalid_qa_report", f"QA report verdict must be one of: {', '.join(sorted(QA_VERDICTS))}", path))
+
+
+def _validate_runtime_payload(payload: Any, path: Path, errors: List[Dict[str, str]]) -> None:
+    if not isinstance(payload, dict):
+        errors.append(_issue("invalid_runtime_report", "Runtime report must be an object", path))
+        return
+    if payload.get("skipped"):
+        return
+    if "returncode" not in payload or not isinstance(payload["returncode"], int):
+        errors.append(_issue("invalid_runtime_report", "Runtime report requires integer returncode", path))
+    agent_runtimes = payload.get("agent_runtimes")
+    if agent_runtimes is None:
+        if "command" in payload and not isinstance(payload.get("command"), list):
+            errors.append(_issue("invalid_runtime_report", "Runtime report command must be an array", path))
+        return
+    if not isinstance(agent_runtimes, dict):
+        errors.append(_issue("invalid_runtime_report", "Runtime report agent_runtimes must be an object", path))
+        return
+    for agent_id, item in agent_runtimes.items():
+        if not isinstance(item, dict):
+            errors.append(_issue("invalid_runtime_report", f"Runtime report for {agent_id} must be an object", path))
+            continue
+        runtime = item.get("runtime")
+        if not isinstance(runtime, dict):
+            errors.append(_issue("invalid_runtime_report", f"Runtime report for {agent_id} requires runtime object", path))
+            continue
+        if not isinstance(runtime.get("returncode"), int):
+            errors.append(_issue("invalid_runtime_report", f"Runtime report for {agent_id} requires integer returncode", path))
 
 
 @click.command("validate")

@@ -88,3 +88,52 @@ def test_validate_reports_invalid_qa_report_artifact():
         assert result.exit_code == 1, result.output
         payload = json.loads(result.output)
         assert any(issue["code"] == "invalid_qa_report" for issue in payload["errors"])
+
+
+def test_validate_reports_invalid_message_artifact_and_phase_consistency():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build consistency validation"])
+        task = json.loads(dispatch.output)["task"]
+        state_path = Path(".solo/state/tasks.json")
+        state = json.loads(state_path.read_text())
+        state["tasks"][0]["current_phase"] = "missing"
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        Path(".solo/state/messages.jsonl").write_text(
+            json.dumps({
+                "task_id": task["id"],
+                "from": "cto",
+                "to": "dev-1",
+                "type": "handoff",
+                "phase": "missing",
+                "artifact": "/tmp/does-not-exist",
+            }) + "\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["validate", "--json"])
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        codes = {issue["code"] for issue in payload["errors"]}
+        assert {"missing_current_phase", "message_unknown_phase", "message_missing_artifact"} <= codes
+
+
+def test_validate_reports_invalid_runtime_report():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build runtime validation"])
+        task_id = json.loads(dispatch.output)["task"]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "cto_breakdown_runtime.json").write_text(
+            json.dumps({"command": "not-a-list"}),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["validate", "--json"])
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert any(issue["code"] == "invalid_runtime_report" for issue in payload["errors"])

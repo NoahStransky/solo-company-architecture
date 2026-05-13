@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 import click
 
 from solo.core.dispatcher import available_adapters
+from solo.core.dashboard import ACTIVE_STATUSES, build_task_dashboard
 from solo.core.project import SoloProject
-from solo.core.task import Task
 from solo.utils.ui import heading, print_json
 
 
@@ -15,7 +15,15 @@ def build_status(project: SoloProject, include_all: bool = False) -> Dict[str, A
     config = project.require_config()
     tasks = project.state.load_tasks()
     selected = tasks if include_all else tasks[-5:]
-    active = [task for task in tasks if task.status in ("pending", "in_progress", "blocked", "waiting_approval")]
+    active = [task for task in tasks if task.status in ACTIVE_STATUSES]
+    events = project.state.load_events()
+    events_by_task: Dict[str, List[Dict[str, Any]]] = {}
+    for event in events:
+        events_by_task.setdefault(event.get("task_id", ""), []).append(event)
+    dashboard_tasks = [
+        build_task_dashboard(task, events=events_by_task.get(task.id, []))
+        for task in selected
+    ]
     return {
         "project": config.project.__dict__,
         "solo_protocol_version": config.solo_protocol_version,
@@ -37,10 +45,17 @@ def build_status(project: SoloProject, include_all: bool = False) -> Dict[str, A
         "summary": {
             "total_tasks": len(tasks),
             "active_tasks": len(active),
+            "failed_tasks": len([task for task in tasks if task.status == "failed"]),
+            "completed_tasks": len([task for task in tasks if task.status == "completed"]),
             "last_updated": tasks[-1].updated_at if tasks else None,
         },
+        "dashboard": {
+            "tasks": dashboard_tasks,
+            "active_task_ids": [task.id for task in active],
+            "failed_task_ids": [task.id for task in tasks if task.status == "failed"],
+        },
         "tasks": [task.to_dict() for task in selected],
-        "recent_events": project.state.load_events(limit=10),
+        "recent_events": events[-10:],
         "recent_messages": project.state.load_messages(limit=10),
     }
 

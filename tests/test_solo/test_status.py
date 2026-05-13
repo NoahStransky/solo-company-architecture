@@ -27,6 +27,16 @@ def test_status_json_is_solo_os_friendly():
         assert "command" in payload["execution"]["available_adapters"]
         assert payload["summary"]["total_tasks"] == 1
         assert payload["summary"]["active_tasks"] == 1
+        assert payload["summary"]["failed_tasks"] == 0
+        assert payload["summary"]["completed_tasks"] == 0
+        assert payload["dashboard"]["active_task_ids"] == [payload["tasks"][0]["id"]]
+        assert payload["dashboard"]["failed_task_ids"] == []
+        dashboard_task = payload["dashboard"]["tasks"][0]
+        assert dashboard_task["task_id"] == payload["tasks"][0]["id"]
+        assert dashboard_task["phase_progress"]["total"] == 6
+        assert dashboard_task["phase_progress"]["percent"] == 0
+        assert dashboard_task["agent_progress"]["total"] == 3
+        assert dashboard_task["failed_reason"] is None
         assert payload["tasks"][0]["current_phase"] == "cto_breakdown"
         assert payload["recent_events"]
         assert payload["recent_messages"]

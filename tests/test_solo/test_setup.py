@@ -119,3 +119,100 @@ def test_dispatch_rejects_missing_runtime_profile():
 
         assert result.exit_code != 0
         assert "Unknown runtime profile" in result.output
+
+
+def test_setup_provider_mcp_skill_and_agent_update_config():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+
+        provider = runner.invoke(
+            main,
+            [
+                "setup",
+                "provider",
+                "local-openai",
+                "--type",
+                "openai-compatible",
+                "--api-key-env",
+                "LOCAL_API_KEY",
+                "--base-url",
+                "http://localhost:11434/v1",
+            ],
+        )
+        mcp = runner.invoke(
+            main,
+            [
+                "setup",
+                "mcp",
+                "local-files",
+                "--command",
+                "npx",
+                "--arg",
+                "-y",
+                "--arg",
+                "@modelcontextprotocol/server-filesystem",
+                "--env",
+                "ROOT=.",
+                "--description",
+                "Local filesystem access",
+                "--enable",
+            ],
+        )
+        skill = runner.invoke(
+            main,
+            [
+                "setup",
+                "skill",
+                "debugging",
+                "--path",
+                "skills/debugging.md",
+                "--description",
+                "Debug failures",
+                "--create-file",
+            ],
+        )
+        agent = runner.invoke(
+            main,
+            [
+                "setup",
+                "agent",
+                "dev",
+                "--provider",
+                "local-openai",
+                "--model",
+                "qwen-coder",
+                "--skill",
+                "debugging",
+                "--mcp",
+                "local-files",
+                "--tool",
+                "run_tests",
+            ],
+        )
+
+        assert provider.exit_code == 0, provider.output
+        assert mcp.exit_code == 0, mcp.output
+        assert skill.exit_code == 0, skill.output
+        assert agent.exit_code == 0, agent.output
+        config = yaml.safe_load(Path(".solo/config.yaml").read_text())
+        assert config["providers"]["local-openai"]["base_url"] == "http://localhost:11434/v1"
+        assert config["mcp_servers"]["local-files"]["args"] == ["-y", "@modelcontextprotocol/server-filesystem"]
+        assert config["mcp_servers"]["local-files"]["env"] == {"ROOT": "."}
+        assert config["skills"]["debugging"]["path"] == "skills/debugging.md"
+        assert Path(".solo/skills/debugging.md").exists()
+        assert config["agents"]["dev"]["provider"] == "local-openai"
+        assert config["agents"]["dev"]["model"] == "qwen-coder"
+        assert config["agents"]["dev"]["skills"] == ["debugging"]
+        assert config["agents"]["dev"]["mcp_servers"] == ["local-files"]
+
+
+def test_setup_agent_rejects_unknown_references():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+
+        result = runner.invoke(main, ["setup", "agent", "dev", "--provider", "missing"])
+
+        assert result.exit_code != 0
+        assert "Unknown provider: missing" in result.output
