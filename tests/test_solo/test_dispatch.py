@@ -69,6 +69,24 @@ def test_dispatch_direct_role():
         assert payload["package"]["agent_role"] == "cto"
 
 
+def test_dispatch_rejects_unknown_adapter_and_role():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+
+        bad_workflow = runner.invoke(main, ["dispatch", "--workflow", "missing", "Build with missing workflow"])
+        assert bad_workflow.exit_code != 0
+        assert "Workflow not found: missing" in bad_workflow.output
+
+        bad_adapter = runner.invoke(main, ["dispatch", "--adapter", "missing", "Build with missing adapter"])
+        assert bad_adapter.exit_code != 0
+        assert "Unknown execution adapter: missing" in bad_adapter.output
+
+        bad_role = runner.invoke(main, ["dispatch", "--to", "missing", "Build with missing role"])
+        assert bad_role.exit_code != 0
+        assert "Unknown agent role: missing" in bad_role.output
+
+
 def test_dispatch_command_adapter_runs_configured_command():
     runner = CliRunner()
     with runner.isolated_filesystem():

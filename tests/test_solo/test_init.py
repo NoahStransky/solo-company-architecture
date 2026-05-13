@@ -45,3 +45,21 @@ def test_init_refuses_existing_solo_dir():
         assert first.exit_code == 0
         assert second.exit_code != 0
         assert "already exists" in second.output
+
+
+def test_init_sets_description_and_rejects_unknown_template():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["init", "--yes", "--name", "described", "--description", "Solo test project"])
+
+        assert result.exit_code == 0, result.output
+        project = SoloProject.find(Path.cwd())
+        assert project is not None
+        assert project.require_config().project.name == "described"
+        assert project.require_config().project.description == "Solo test project"
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["init", "--template", "missing", "--yes"])
+
+        assert result.exit_code != 0
+        assert "Unknown template: missing" in result.output

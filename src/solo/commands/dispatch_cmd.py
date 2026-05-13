@@ -25,6 +25,8 @@ def dispatch_task(
     workflow_name = workflow_name or config.default_workflow
 
     if role:
+        if role not in config.agents:
+            raise click.ClickException(f"Unknown agent role: {role}")
         workflow = Workflow(name=f"direct:{role}", description="Direct role dispatch", phases=[])
     else:
         workflow = project.workflows.load(workflow_name)
@@ -96,7 +98,7 @@ def dispatch(role: str, workflow_name: str, adapter: str, as_json: bool, descrip
     text = " ".join(description).strip()
     try:
         result = dispatch_task(project, text, workflow_name=workflow_name, role=role, adapter=adapter)
-    except (KeyError, ValueError) as exc:
+    except (FileNotFoundError, KeyError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     if as_json:
         print_json(result)

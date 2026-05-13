@@ -60,6 +60,52 @@ def test_setup_runtime_rejects_unknown_role():
         assert "Unknown agent role" in result.output
 
 
+def test_setup_runtime_package_preset_can_be_default_without_command():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+
+        result = runner.invoke(
+            main,
+            [
+                "setup",
+                "runtime",
+                "offline-package",
+                "--preset",
+                "package",
+                "--set-default",
+                "--for",
+                "qa",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        config = yaml.safe_load(Path(".solo/config.yaml").read_text())
+        assert config["runtime_profiles"]["offline-package"]["adapter"] == "package"
+        assert config["execution"]["default_profile"] == "offline-package"
+        assert config["execution"]["default_adapter"] == "package"
+        assert config["agents"]["qa"]["runtime"] == "offline-package"
+        assert "Default runtime: offline-package" in result.output
+        assert "qa runtime: offline-package" in result.output
+
+
+def test_setup_runtime_rejects_invalid_env_and_empty_command_profile():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+
+        invalid_env = runner.invoke(
+            main,
+            ["setup", "runtime", "bad-env", "--command", sys.executable, "--env", "BROKEN"],
+        )
+        assert invalid_env.exit_code != 0
+        assert "Invalid --env value" in invalid_env.output
+
+        empty_command = runner.invoke(main, ["setup", "runtime", "empty-command"])
+        assert empty_command.exit_code != 0
+        assert "Command adapter profiles require --command" in empty_command.output
+
+
 def test_dispatch_rejects_missing_runtime_profile():
     runner = CliRunner()
     with runner.isolated_filesystem():

@@ -574,6 +574,13 @@ Adapter 建议：
 - 这些测试不改变当前主线通过状态，但会在对应能力实现后要求移除 xfail 并转为正式回归测试。
 - 当前验证：`docker compose run --rm test` 通过，`38 passed, 5 xfailed`。
 
+继续补齐已有 CLI 命令测试覆盖：
+
+- 新增命令级测试，覆盖所有 project command 在非 `.solo` 项目内的报错、CLI help 命令列表、`solo start` 交互 loop、`solo status --all`、`solo inspect` / `solo complete` 错误路径。
+- 扩展 `solo init`、`solo dispatch`、`solo setup runtime` 测试，覆盖 description、未知 template、未知 workflow/adapter/role、package preset、invalid env、empty command profile。
+- 修复 `solo dispatch --to <missing-role>` 和未知 workflow 的错误处理，避免内部异常泄漏到 CLI。
+- 当前验证：`docker compose run --rm test` 通过，`55 passed, 5 xfailed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -593,6 +600,7 @@ Adapter 建议：
 - `solo run --once` 已成为推进当前 task 的统一入口；runtime 失败会落到 `failed` 状态和 `phase.failed` 事件。
 - default template 已包含 runtime wrapper contract 和 dummy runtime 示例。
 - retry / reopen / run-until 的测试规格已先行建立。
+- 已有 CLI commands 的项目边界、交互入口、错误路径和 setup runtime 分支已补测试覆盖。
 
 ### Progress Snapshot
 
@@ -620,6 +628,7 @@ Adapter 建议：
 | Run once / runtime failure semantics | Done | `solo run --once` 可推进一阶段；command runtime 失败会标记 phase/task failed |
 | Runtime wrapper contract | Done | default template 包含 wrapper contract 和 dummy runtime 示例 |
 | Retry / reopen / run-until specs | Test-first | 已创建严格 xfail 测试，作为下一阶段实现验收线 |
+| CLI command coverage | Done | 已补齐已有命令的 project boundary、help、start/status/inspect/complete/setup 错误路径测试 |
 
 当前新增能力：
 
