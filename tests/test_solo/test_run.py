@@ -135,6 +135,44 @@ def test_run_with_template_dummy_runtime_advances_multiple_phases():
         assert state["tasks"][0]["work_packages"][0]["status"] == "completed"
 
 
+def test_run_until_done_with_template_cli_wrapper_runtime():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        wrapper = str((Path.cwd() / ".solo/runtime/examples/cli_wrapper.py").resolve())
+        setup = runner.invoke(
+            main,
+            [
+                "setup",
+                "runtime",
+                "generic-cli",
+                "--command",
+                sys.executable,
+                "--arg",
+                wrapper,
+                "--set-default",
+            ],
+        )
+        assert setup.exit_code == 0, setup.output
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build generic wrapper flow"])
+        assert dispatch.exit_code == 0, dispatch.output
+        task_id = json.loads(dispatch.output)["task"]["id"]
+
+        result = runner.invoke(main, ["run", "--until", "done", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["stopped_reason"] == "completed"
+        assert payload["task"]["status"] == "completed"
+        artifact_dir = Path(".solo/artifacts") / task_id
+        assert (artifact_dir / "cto_breakdown_result.json").exists()
+        assert (artifact_dir / "dev-1_agent_result.json").exists()
+        assert (artifact_dir / "qa_report.json").exists()
+        assert (artifact_dir / "secretary_report.md").exists()
+        validate = runner.invoke(main, ["validate", "--json"])
+        assert validate.exit_code == 0, validate.output
+
+
 def test_run_until_qa_advances_until_requested_phase():
     runner = CliRunner()
     with runner.isolated_filesystem():

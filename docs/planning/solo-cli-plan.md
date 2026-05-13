@@ -607,6 +607,13 @@ Adapter 建议：
 - README 新增从 `solo init` 到 dummy runtime `solo run --until done` 的完整 demo。
 - 当前验证：`docker compose run --rm test` 通过，`67 passed`。
 
+继续补真实 runtime 接入前的验收面：
+
+- 新增 `solo setup list` 和 `solo setup show <agent|provider|runtime|mcp|skill|execution>`，支持 `--json`，方便不用打开 YAML 也能检查配置。
+- 新增通用 `cli_wrapper.py` 的端到端测试，使用 runtime profile 跑 `solo run --until done`，验证外部 CLI wrapper contract 能完整闭环。
+- README 的 wrapper 示例改为绝对路径写法，匹配 command adapter 以 task artifact directory 为 cwd 的运行语义。
+- 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_setup.py tests/test_solo/test_run.py -q` 通过，`17 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -630,6 +637,7 @@ Adapter 建议：
 - runtime orchestration 下一层已完成研究记录，下一步实现优先级是 runner/refactor 与 `run --until`。
 - runtime orchestration 已完成第一版：`run --until`、`reopen`、`retry phase`、`retry agent`、agent pool 部分失败状态和 bounded parallel execution 均已落地。
 - dashboard JSON、协议验证、setup 配置入口、通用 CLI wrapper 示例和 README 完整 demo 已补齐。
+- setup 查看面和 generic CLI wrapper 端到端验收已补齐，真实 CLI runtime 接入前的合同更稳。
 
 ### Progress Snapshot
 
@@ -665,6 +673,8 @@ Adapter 建议：
 | Setup config commands | Done | `solo setup agent/provider/mcp/skill` 可管理常见配置 |
 | Generic CLI wrapper example | Done | default template 包含 `runtime/examples/cli_wrapper.py` |
 | README end-to-end demo | Done | README 展示 dummy runtime 从 init 到 `run --until done` 的完整路径 |
+| Setup list/show | Done | `solo setup list/show` 支持查看配置并输出 JSON |
+| Generic CLI wrapper e2e | Done | 通用 wrapper 已通过 `run --until done` 端到端测试 |
 
 当前新增能力：
 

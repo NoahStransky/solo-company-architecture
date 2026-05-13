@@ -1,13 +1,13 @@
 """solo setup commands."""
 
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import click
 
 from solo.core.config import AgentConfig, CommandRuntimeConfig, MCPServerConfig, ProviderConfig, RuntimeProfileConfig, SkillConfig, save_config
 from solo.core.project import SoloProject
-from solo.utils.ui import success
+from solo.utils.ui import print_json, success
 
 
 RUNTIME_PRESETS: Dict[str, RuntimeProfileConfig] = {
@@ -41,6 +41,38 @@ RUNTIME_PRESETS: Dict[str, RuntimeProfileConfig] = {
 @click.group("setup")
 def setup():
     """Configure solo project helpers."""
+
+
+@setup.command("list")
+@click.option("--json", "as_json", is_flag=True, help="Print structured JSON.")
+def setup_list(as_json: bool):
+    """List configured agents, providers, runtimes, MCP servers, and skills."""
+    project = _require_project()
+    config = project.require_config()
+    payload = _setup_index(config.to_dict())
+    if as_json:
+        print_json(payload)
+        return
+    for key, values in payload.items():
+        click.echo(f"{key}: {', '.join(values) if values else '-'}")
+
+
+@setup.command("show")
+@click.argument("kind", type=click.Choice(["agent", "provider", "runtime", "mcp", "skill", "execution"]))
+@click.argument("name", required=False)
+@click.option("--json", "as_json", is_flag=True, help="Print structured JSON.")
+def setup_show(kind: str, name: Optional[str], as_json: bool):
+    """Show one setup entry."""
+    project = _require_project()
+    config = project.require_config()
+    config_data = config.to_dict()
+    payload = _setup_entry(config_data, kind, name)
+    if as_json:
+        print_json(payload)
+        return
+    click.echo(f"{kind}{f' {name}' if name else ''}:")
+    for key, value in payload.items():
+        click.echo(f"  {key}: {value}")
 
 
 @setup.command("runtime")
@@ -245,3 +277,34 @@ def _require_project() -> SoloProject:
     if project is None:
         raise click.ClickException("No .solo project found. Run solo init first.")
     return project
+
+
+def _setup_index(config_data: Dict[str, Any]) -> Dict[str, list]:
+    return {
+        "agents": sorted(config_data.get("agents", {}).keys()),
+        "providers": sorted(config_data.get("providers", {}).keys()),
+        "runtimes": sorted(config_data.get("runtime_profiles", {}).keys()),
+        "mcp_servers": sorted(config_data.get("mcp_servers", {}).keys()),
+        "skills": sorted(config_data.get("skills", {}).keys()),
+    }
+
+
+def _setup_entry(config_data: Dict[str, Any], kind: str, name: Optional[str]) -> Dict[str, Any]:
+    if kind == "execution":
+        if name:
+            raise click.ClickException("setup show execution does not take a name.")
+        return config_data.get("execution", {})
+    key_by_kind = {
+        "agent": "agents",
+        "provider": "providers",
+        "runtime": "runtime_profiles",
+        "mcp": "mcp_servers",
+        "skill": "skills",
+    }
+    collection_key = key_by_kind[kind]
+    if not name:
+        raise click.ClickException(f"setup show {kind} requires a name.")
+    collection = config_data.get(collection_key, {})
+    if name not in collection:
+        raise click.ClickException(f"Unknown {kind}: {name}")
+    return collection[name]

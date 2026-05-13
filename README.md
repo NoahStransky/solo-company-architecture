@@ -50,7 +50,7 @@ New projects include a local dummy runtime that writes valid Solo artifacts with
 solo init --yes --name demo-company
 solo setup runtime dummy \
   --command python \
-  --arg .solo/runtime/examples/dummy_runtime.py \
+  --arg "$(pwd)/.solo/runtime/examples/dummy_runtime.py" \
   --set-default
 solo dispatch --json "Build a small RSS subscription feature"
 solo run --until done --json
@@ -233,10 +233,20 @@ New projects include `.solo/runtime/wrapper-contract.md`, `.solo/runtime/example
 ```bash
 solo setup runtime generic-cli \
   --command python \
-  --arg .solo/runtime/examples/cli_wrapper.py \
+  --arg "$(pwd)/.solo/runtime/examples/cli_wrapper.py" \
   --arg=-- \
   --arg your-agent-cli \
   --set-default
+```
+
+Inspect setup without opening YAML:
+
+```bash
+solo setup list
+solo setup list --json
+solo setup show agent dev --json
+solo setup show runtime generic-cli --json
+solo setup show execution --json
 ```
 
 ## Protocol Validation
@@ -261,6 +271,8 @@ solo run
 solo status
 solo start
 solo setup runtime
+solo setup list
+solo setup show
 solo setup agent
 solo setup provider
 solo setup mcp

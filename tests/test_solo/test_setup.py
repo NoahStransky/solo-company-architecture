@@ -216,3 +216,41 @@ def test_setup_agent_rejects_unknown_references():
 
         assert result.exit_code != 0
         assert "Unknown provider: missing" in result.output
+
+
+def test_setup_list_and_show_return_config_entries():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        assert runner.invoke(main, ["setup", "runtime", "dummy", "--preset", "package", "--set-default"]).exit_code == 0
+
+        listed = runner.invoke(main, ["setup", "list", "--json"])
+        agent = runner.invoke(main, ["setup", "show", "agent", "dev", "--json"])
+        runtime = runner.invoke(main, ["setup", "show", "runtime", "dummy", "--json"])
+        execution = runner.invoke(main, ["setup", "show", "execution", "--json"])
+
+        assert listed.exit_code == 0, listed.output
+        assert agent.exit_code == 0, agent.output
+        assert runtime.exit_code == 0, runtime.output
+        assert execution.exit_code == 0, execution.output
+        listed_payload = json.loads(listed.output)
+        assert "dev" in listed_payload["agents"]
+        assert "openai" in listed_payload["providers"]
+        assert "dummy" in listed_payload["runtimes"]
+        assert json.loads(agent.output)["provider"] == "anthropic"
+        assert json.loads(runtime.output)["adapter"] == "package"
+        assert json.loads(execution.output)["default_profile"] == "dummy"
+
+
+def test_setup_show_rejects_missing_name_and_unknown_entry():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+
+        missing_name = runner.invoke(main, ["setup", "show", "agent"])
+        unknown = runner.invoke(main, ["setup", "show", "runtime", "missing"])
+
+        assert missing_name.exit_code != 0
+        assert "requires a name" in missing_name.output
+        assert unknown.exit_code != 0
+        assert "Unknown runtime: missing" in unknown.output
