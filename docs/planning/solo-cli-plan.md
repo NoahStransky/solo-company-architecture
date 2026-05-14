@@ -614,6 +614,12 @@ Adapter 建议：
 - README 的 wrapper 示例改为绝对路径写法，匹配 command adapter 以 task artifact directory 为 cwd 的运行语义。
 - 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_setup.py tests/test_solo/test_run.py -q` 通过，`17 passed`。
 
+继续增强终端可读性：
+
+- `solo status` 普通文本输出新增任务总览、execution 信息、phase progress、agent progress、work package progress 和 failed reason。
+- `solo inspect` 普通文本输出新增 phase/agent/work package progress、failed reason、artifact 摘要、recent events 和 recent messages。
+- 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_status.py tests/test_solo/test_inspect.py -q` 通过，`8 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -638,6 +644,7 @@ Adapter 建议：
 - runtime orchestration 已完成第一版：`run --until`、`reopen`、`retry phase`、`retry agent`、agent pool 部分失败状态和 bounded parallel execution 均已落地。
 - dashboard JSON、协议验证、setup 配置入口、通用 CLI wrapper 示例和 README 完整 demo 已补齐。
 - setup 查看面和 generic CLI wrapper 端到端验收已补齐，真实 CLI runtime 接入前的合同更稳。
+- `solo status` / `solo inspect` 的人类可读输出已与 dashboard summary 对齐。
 
 ### Progress Snapshot
 
@@ -675,6 +682,7 @@ Adapter 建议：
 | README end-to-end demo | Done | README 展示 dummy runtime 从 init 到 `run --until done` 的完整路径 |
 | Setup list/show | Done | `solo setup list/show` 支持查看配置并输出 JSON |
 | Generic CLI wrapper e2e | Done | 通用 wrapper 已通过 `run --until done` 端到端测试 |
+| Human-readable status/inspect | Done | `solo status` / `solo inspect` 文本输出展示进度、失败原因、artifact 和 recent activity |
 
 当前新增能力：
 

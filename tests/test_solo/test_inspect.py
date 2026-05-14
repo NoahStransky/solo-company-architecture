@@ -34,6 +34,27 @@ def test_inspect_json_returns_task_context():
         assert {"input", "instruction", "task_snapshot"} <= artifact_kinds
 
 
+def test_inspect_text_includes_dashboard_summary_and_recent_activity():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes", "--name", "inspect-text-demo"]).exit_code == 0
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build inspect text view"])
+        task_id = json.loads(dispatch.output)["task"]["id"]
+
+        result = runner.invoke(main, ["inspect", "--task", task_id])
+
+        assert result.exit_code == 0, result.output
+        assert f"Solo task: {task_id}" in result.output
+        assert "Phase progress: 0% (0/6 done, 0 skipped)" in result.output
+        assert "Agent progress:" in result.output
+        assert "Artifacts:" in result.output
+        assert "instruction:" in result.output
+        assert "Events:" in result.output
+        assert "phase.started cto_breakdown" in result.output
+        assert "Messages:" in result.output
+        assert "secretary -> cto assignment" in result.output
+
+
 def test_inspect_can_select_task_by_id():
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -106,3 +127,30 @@ def test_inspect_dashboard_reports_failed_runtime_reason():
             if instance["phase"] == "dev_pool"
         }
         assert set(payload["dashboard"]["failed_reason"]["failed_agents"]) == expected_failed_agents
+
+
+def test_inspect_text_includes_failed_reason():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        dispatch = runner.invoke(main, ["dispatch", "--json", "Build failing inspect text"])
+        task_id = json.loads(dispatch.output)["task"]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "cto_breakdown_output.md").write_text("CTO work packages", encoding="utf-8")
+        config_path = Path(".solo/config.yaml")
+        config = yaml.safe_load(config_path.read_text())
+        config["execution"]["default_adapter"] = "command"
+        config["execution"]["command"] = {
+            "command": sys.executable,
+            "args": ["-c", "import sys; sys.exit(12)"],
+            "timeout": 30,
+            "env": {},
+        }
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        assert runner.invoke(main, ["run", "--once", "--json"]).exit_code == 0
+
+        result = runner.invoke(main, ["inspect", "--task", task_id])
+
+        assert result.exit_code == 0, result.output
+        assert "Failed: Phase dev_pool failed | returncode=12" in result.output
+        assert "agents=" in result.output

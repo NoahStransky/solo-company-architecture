@@ -41,3 +41,20 @@ def test_status_json_is_solo_os_friendly():
         assert payload["recent_events"]
         assert payload["recent_messages"]
         assert payload["recent_messages"][-1]["to"] == "cto"
+
+
+def test_status_text_includes_dashboard_progress():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes", "--name", "status-text-demo"]).exit_code == 0
+        assert runner.invoke(main, ["dispatch", "Implement auth API"]).exit_code == 0
+
+        result = runner.invoke(main, ["status"])
+
+        assert result.exit_code == 0, result.output
+        assert "Solo status: status-text-demo" in result.output
+        assert "Tasks: 1 total, 1 active, 0 failed, 0 completed" in result.output
+        assert "Execution: adapter=package profile=-" in result.output
+        assert "cto_breakdown" in result.output
+        assert "phases: 0/6 done" in result.output
+        assert "agents:" in result.output

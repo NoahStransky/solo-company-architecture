@@ -102,10 +102,51 @@ def inspect(task_id: str, as_json: bool):
         print_json(payload)
         return
     task = payload["task"]
+    dashboard = payload["dashboard"]
+    phase_progress = dashboard["phase_progress"]
+    agent_progress = dashboard["agent_progress"]
+    work_progress = dashboard["work_package_progress"]
     heading(f"Solo task: {task['id']}")
     click.echo(f"Status: {task['status']}")
     click.echo(f"Current phase: {task['current_phase']}")
     click.echo(f"Title: {task['title']}")
+    click.echo(
+        "Phase progress: "
+        f"{phase_progress['percent']}% "
+        f"({phase_progress['done']}/{phase_progress['total']} done, "
+        f"{phase_progress['skipped']} skipped)"
+    )
+    if agent_progress["total"]:
+        click.echo(f"Agent progress: {agent_progress['percent']}% {_format_status_counts(agent_progress['by_status'])}")
+    if work_progress["total"]:
+        click.echo(f"Work package progress: {work_progress['percent']}% {_format_status_counts(work_progress['by_status'])}")
+    if dashboard.get("failed_reason"):
+        click.echo(f"Failed: {_format_failed_reason(dashboard['failed_reason'])}")
     click.echo(f"Artifacts: {len(payload['artifacts'])}")
+    for artifact in payload["artifacts"][:8]:
+        click.echo(f"  {artifact['kind']}: {artifact['relative_path']}")
+    if len(payload["artifacts"]) > 8:
+        click.echo(f"  ... {len(payload['artifacts']) - 8} more")
     click.echo(f"Events: {len(payload['events'])}")
+    for event in payload["events"][-5:]:
+        click.echo(f"  {event['event']} {event.get('phase', '')}".rstrip())
     click.echo(f"Messages: {len(payload['messages'])}")
+    for message in payload["messages"][-5:]:
+        click.echo(f"  {message['from']} -> {message['to']} {message['type']}")
+
+
+def _format_status_counts(counts: Dict[str, int]) -> str:
+    if not counts:
+        return "-"
+    return ", ".join(f"{status}={count}" for status, count in sorted(counts.items()))
+
+
+def _format_failed_reason(reason: Dict[str, Any]) -> str:
+    parts = [reason.get("message", "Task failed")]
+    if reason.get("runtime_returncode") is not None:
+        parts.append(f"returncode={reason['runtime_returncode']}")
+    if reason.get("failed_agents"):
+        parts.append(f"agents={','.join(reason['failed_agents'])}")
+    if reason.get("runtime_report"):
+        parts.append(f"runtime_report={reason['runtime_report']}")
+    return " | ".join(parts)

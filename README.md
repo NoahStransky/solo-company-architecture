@@ -63,6 +63,7 @@ Expected result:
 
 - `solo run --until done` advances through CTO breakdown, dev pool, QA, CTO review, and secretary report.
 - `.solo/artifacts/<task_id>/` contains instruction/input files, runtime reports, work packages, dev results, QA report, and the final report.
+- `solo status` and `solo inspect` show progress, agent/work package status, recent activity, artifacts, and failure details in a terminal-friendly format.
 - `solo status --json` includes stable `dashboard.tasks[*]` cards with phase progress, agent progress, work package progress, and failed reason fields.
 - `solo inspect --json` includes the same dashboard summary plus full events, messages, and artifact manifest for one task.
 

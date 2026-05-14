@@ -74,10 +74,61 @@ def status(include_all: bool, as_json: bool):
         return
 
     heading(f"Solo status: {payload['project']['name']}")
+    summary = payload["summary"]
+    execution = payload["execution"]
+    click.echo(
+        "Tasks: "
+        f"{summary['total_tasks']} total, "
+        f"{summary['active_tasks']} active, "
+        f"{summary['failed_tasks']} failed, "
+        f"{summary['completed_tasks']} completed"
+    )
+    click.echo(
+        "Execution: "
+        f"adapter={execution['default_adapter']} "
+        f"profile={execution['default_profile'] or '-'}"
+    )
     if not payload["tasks"]:
         click.echo("No tasks yet.")
         return
-    for task in payload["tasks"]:
-        click.echo(f"{task['id']}  {task['status']}  {task['current_phase']}  {task['title']}")
-        if task.get("planned_dev_agents"):
-            click.echo(f"  planned dev agents: {task['planned_dev_agents']}")
+    for task in payload["dashboard"]["tasks"]:
+        phase_progress = task["phase_progress"]
+        agent_progress = task["agent_progress"]
+        work_progress = task["work_package_progress"]
+        click.echo(
+            f"{task['task_id']}  {task['status']}  "
+            f"{phase_progress['percent']}%  "
+            f"{task['current_phase'] or '-'}  {task['title']}"
+        )
+        click.echo(
+            f"  phases: {phase_progress['done']}/{phase_progress['total']} done"
+            f" ({phase_progress['completed']} completed, {phase_progress['skipped']} skipped)"
+        )
+        if agent_progress["total"]:
+            click.echo(
+                f"  agents: {agent_progress['percent']}% "
+                f"{_format_status_counts(agent_progress['by_status'])}"
+            )
+        if work_progress["total"]:
+            click.echo(
+                f"  work packages: {work_progress['percent']}% "
+                f"{_format_status_counts(work_progress['by_status'])}"
+            )
+        failed_reason = task.get("failed_reason")
+        if failed_reason:
+            click.echo(f"  failed: {_format_failed_reason(failed_reason)}")
+
+
+def _format_status_counts(counts: Dict[str, int]) -> str:
+    if not counts:
+        return "-"
+    return ", ".join(f"{status}={count}" for status, count in sorted(counts.items()))
+
+
+def _format_failed_reason(reason: Dict[str, Any]) -> str:
+    parts = [reason.get("message", "Task failed")]
+    if reason.get("runtime_returncode") is not None:
+        parts.append(f"returncode={reason['runtime_returncode']}")
+    if reason.get("failed_agents"):
+        parts.append(f"agents={','.join(reason['failed_agents'])}")
+    return " | ".join(parts)
