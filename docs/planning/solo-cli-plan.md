@@ -620,6 +620,14 @@ Adapter 建议：
 - `solo inspect` 普通文本输出新增 phase/agent/work package progress、failed reason、artifact 摘要、recent events 和 recent messages。
 - 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_status.py tests/test_solo/test_inspect.py -q` 通过，`8 passed`。
 
+继续补协议版本 / migrate 最小骨架：
+
+- 新增 `solo migrate`，可用 `--check` / `--json` 检查或迁移 `.solo/config.yaml` 协议版本。
+- `solo migrate` 不依赖 `SoloProject.load()`，即使当前 CLI 无法加载 config，也能读取 raw YAML、给出计划并迁移。
+- v0 -> v1 migration 会补齐 protocol version 和常见顶层配置段，默认写备份。
+- `solo validate --json` 遇到不支持的 protocol version 时返回结构化错误和 migration hint。
+- 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_migrate.py tests/test_solo/test_validate.py tests/test_solo/test_cli_commands.py -q` 通过，`27 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -645,6 +653,7 @@ Adapter 建议：
 - dashboard JSON、协议验证、setup 配置入口、通用 CLI wrapper 示例和 README 完整 demo 已补齐。
 - setup 查看面和 generic CLI wrapper 端到端验收已补齐，真实 CLI runtime 接入前的合同更稳。
 - `solo status` / `solo inspect` 的人类可读输出已与 dashboard summary 对齐。
+- `solo migrate` 已提供协议升级最小骨架，`validate` 能给 migration hint。
 
 ### Progress Snapshot
 
@@ -683,6 +692,7 @@ Adapter 建议：
 | Setup list/show | Done | `solo setup list/show` 支持查看配置并输出 JSON |
 | Generic CLI wrapper e2e | Done | 通用 wrapper 已通过 `run --until done` 端到端测试 |
 | Human-readable status/inspect | Done | `solo status` / `solo inspect` 文本输出展示进度、失败原因、artifact 和 recent activity |
+| Protocol migration skeleton | Done | `solo migrate` 支持 check/apply/backup/json，`validate` 会提示 migration |
 
 当前新增能力：
 
@@ -851,13 +861,11 @@ tests/test_solo/
 
 最新推荐实现顺序：
 
-1. 抽 `solo.core.runner`，把 `complete_task` 内的 phase 推进、adapter 调用、failure 处理拆到可复用服务。
-2. 实现 `solo run --until <phase|blocked|done>`，移除对应 strict xfail。
-3. 实现 `solo reopen --phase`，支持不运行 runtime 的失败恢复。
-4. 实现 `solo retry --phase`，复用 reopen + run-once。
-5. 改进 agent pool 部分失败状态，按 instance returncode 更新 agent instance。
-6. 实现 `solo retry --agent`。
-7. 在 command adapter 内加入 bounded parallel execution，使用 `delegation.max_parallel_dev_agents` 控制并发。
+1. 为 `.solo/` 协议补最小 migration 层：`solo migrate --check/--json`、备份、v0 -> v1 默认迁移和 `validate` migration hint。
+2. 继续收敛 protocol compatibility：在 `status --json` / `inspect --json` 输出中显式暴露 protocol version、CLI supported protocol 和 migration 状态。
+3. 增加 task/message/artifact schema 的 fixture 兼容测试，锁住 solo-os dashboard 依赖的字段。
+4. 设计真实 runtime wrapper 的下一层：Codex/Claude Code/Hermes/OpenClaw 仍先走通用 CLI wrapper contract，不做专用 adapter。
+5. 开始 solo-os read-only dashboard 前置协议包：整理 `.solo/` 文件协议、CLI JSON contract 和 dashboard polling 建议。
 
 旧 MVP 闭环仍然保持：
 

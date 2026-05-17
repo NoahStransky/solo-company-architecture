@@ -8,6 +8,7 @@ import click
 
 from solo.core.config import SoloConfig
 from solo.core.dispatcher import available_adapters
+from solo.core.migration import find_solo_root, load_raw_config, migration_plan
 from solo.core.project import SoloProject
 from solo.core.task import COMPLETED, FAILED, IN_PROGRESS, PENDING, SKIPPED
 from solo.core.workflow import Workflow
@@ -391,7 +392,16 @@ def _validate_runtime_payload(payload: Any, path: Path, errors: List[Dict[str, s
 @click.option("--json", "as_json", is_flag=True, help="Print structured JSON.")
 def validate(as_json: bool):
     """Validate the local .solo protocol directory."""
-    project = SoloProject.find(Path.cwd())
+    try:
+        project = SoloProject.find(Path.cwd())
+    except ValueError as exc:
+        payload = _protocol_version_error_payload(Path.cwd(), str(exc))
+        if as_json:
+            print_json(payload)
+        else:
+            for issue in payload["errors"]:
+                click.echo(f"ERROR {issue['code']}: {issue['message']}", err=True)
+        raise click.exceptions.Exit(1)
     if project is None:
         raise click.ClickException("No .solo project found. Run solo init first.")
     payload = validate_project(project)
@@ -406,3 +416,35 @@ def validate(as_json: bool):
             click.echo(f"WARN {issue['code']}: {issue['message']}", err=True)
     if not payload["ok"]:
         raise click.exceptions.Exit(1)
+
+
+def _protocol_version_error_payload(path: Path, message: str) -> Dict[str, Any]:
+    root = find_solo_root(path)
+    errors = [_issue("unsupported_protocol_version", message)]
+    warnings: List[Dict[str, str]] = []
+    project = {}
+    version = 0
+    if root is not None:
+        config_path = root / ".solo" / "config.yaml"
+        try:
+            config_data = load_raw_config(config_path)
+            project = dict(config_data.get("project") or {})
+            plan = migration_plan(config_data)
+            version = plan["from_version"]
+            if plan.get("needed"):
+                warnings.append(_issue("migration_available", "Run solo migrate to update this project protocol.", config_path))
+            elif plan.get("error"):
+                errors[0] = _issue("unsupported_protocol_version", plan["error"], config_path)
+        except (OSError, TypeError, ValueError):
+            pass
+    return {
+        "ok": False,
+        "project": project,
+        "solo_protocol_version": version,
+        "summary": {
+            "errors": len(errors),
+            "warnings": len(warnings),
+        },
+        "errors": errors,
+        "warnings": warnings,
+    }

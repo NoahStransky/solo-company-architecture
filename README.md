@@ -259,12 +259,26 @@ solo validate
 solo validate --json
 ```
 
+## Protocol Migration
+
+Use `solo migrate` to inspect or update `.solo/config.yaml` when the protocol version changes.
+
+```bash
+solo migrate --check
+solo migrate --check --json
+solo migrate --json
+solo migrate --no-backup
+```
+
+`solo migrate` can run even when the current CLI cannot load the project config. When it applies a migration, it writes a backup by default.
+
 ## Current Commands
 
 ```bash
 solo init
 solo dispatch
 solo inspect
+solo migrate
 solo complete
 solo reopen
 solo retry

@@ -137,3 +137,20 @@ def test_validate_reports_invalid_runtime_report():
         assert result.exit_code == 1, result.output
         payload = json.loads(result.output)
         assert any(issue["code"] == "invalid_runtime_report" for issue in payload["errors"])
+
+
+def test_validate_reports_protocol_version_migration_hint():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        config_path = Path(".solo/config.yaml")
+        config = yaml.safe_load(config_path.read_text())
+        config["solo_protocol_version"] = 0
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+        result = runner.invoke(main, ["validate", "--json"])
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert payload["errors"][0]["code"] == "unsupported_protocol_version"
+        assert payload["warnings"][0]["code"] == "migration_available"

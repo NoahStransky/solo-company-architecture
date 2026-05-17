@@ -7,6 +7,7 @@ from .commands.complete_cmd import complete
 from .commands.dispatch_cmd import dispatch
 from .commands.inspect_cmd import inspect
 from .commands.init_cmd import init
+from .commands.migrate_cmd import migrate
 from .commands.reopen_cmd import reopen
 from .commands.retry_cmd import retry
 from .commands.run_cmd import run
@@ -25,6 +26,7 @@ def main():
 main.add_command(init)
 main.add_command(dispatch)
 main.add_command(inspect)
+main.add_command(migrate)
 main.add_command(complete)
 main.add_command(reopen)
 main.add_command(retry)
