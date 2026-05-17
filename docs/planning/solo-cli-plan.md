@@ -647,6 +647,12 @@ Adapter 建议：
 - 文档覆盖 required files、preferred CLI reads、protocol compatibility、dashboard payload、polling、message semantics、artifact kinds、health checks 和测试入口。
 - README 已链接该 contract，方便后续 solo-os 项目直接按协议实现 dashboard。
 
+继续整理真实 runtime wrapper 接入策略：
+
+- 新增 `docs/protocol/runtime-wrapper-integration.md`，明确 Codex、Claude Code、Hermes、OpenClaw 优先通过 `command` adapter + wrapper contract 接入。
+- 文档记录 wrapper 环境变量、推荐 `solo setup runtime` 形态、phase 输出 artifact、provider/model 归属、失败语义和何时才需要专用 adapter。
+- README 已链接该 runtime wrapper 文档。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -676,6 +682,7 @@ Adapter 建议：
 - `solo status --json` / `solo inspect --json` 已显式暴露 protocol compatibility summary。
 - solo-os 依赖的 dashboard/task/message/artifact 字段已有 completed-flow contract 测试覆盖。
 - solo-os read-only dashboard contract 已独立成文档，当前项目和未来 control plane 的边界更清楚。
+- 真实 agent CLI 接入策略已收敛到通用 wrapper，不复制各工具自己的 setup surface。
 
 ### Progress Snapshot
 
@@ -718,6 +725,7 @@ Adapter 建议：
 | Protocol compatibility JSON | Done | `status --json` / `inspect --json` 暴露 version、supported version 和 migration 状态 |
 | solo-os contract tests | Done | completed dummy flow 锁住 dashboard、task、message 和 artifact manifest 字段 |
 | solo-os dashboard contract doc | Done | `docs/protocol/solo-os-dashboard-contract.md` 记录 read-only dashboard 协议 |
+| Runtime wrapper integration doc | Done | `docs/protocol/runtime-wrapper-integration.md` 记录真实 CLI runtime 接入策略 |
 
 当前新增能力：
 
@@ -886,8 +894,8 @@ tests/test_solo/
 
 最新推荐实现顺序：
 
-1. 设计真实 runtime wrapper 的下一层：Codex/Claude Code/Hermes/OpenClaw 仍先走通用 CLI wrapper contract，不做专用 adapter。
-2. 基于 read-only dashboard contract 开始 solo-os 项目的最小 dashboard 骨架。
+1. 基于 read-only dashboard contract 开始 solo-os 项目的最小 dashboard 骨架。
+2. 在真实项目中试接一个外部 CLI runtime，并根据实际摩擦补 wrapper 示例。
 
 旧 MVP 闭环仍然保持：
 
