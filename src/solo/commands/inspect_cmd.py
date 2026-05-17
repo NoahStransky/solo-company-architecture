@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import click
 
-from solo.core.dashboard import build_task_dashboard
+from solo.core.dashboard import build_protocol_dashboard, build_task_dashboard
 from solo.core.project import SoloProject
 from solo.core.task import IN_PROGRESS, Task
 from solo.utils.ui import heading, print_json
@@ -17,6 +17,7 @@ def inspect_task(project: SoloProject, task_id: Optional[str] = None) -> Dict[st
     if not tasks:
         raise click.ClickException("No tasks found.")
     task = _select_task(tasks, task_id)
+    config = project.require_config()
     artifact_dir = Path(task.artifacts_dir)
     events = [
         event
@@ -24,7 +25,8 @@ def inspect_task(project: SoloProject, task_id: Optional[str] = None) -> Dict[st
         if event.get("task_id") == task.id
     ]
     return {
-        "project": project.require_config().project.__dict__,
+        "project": config.project.__dict__,
+        "protocol": build_protocol_dashboard(config),
         "task": task.to_dict(),
         "dashboard": build_task_dashboard(task, events=events),
         "paths": {

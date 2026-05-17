@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 import click
 
 from solo.core.dispatcher import available_adapters
-from solo.core.dashboard import ACTIVE_STATUSES, build_task_dashboard
+from solo.core.dashboard import ACTIVE_STATUSES, build_protocol_dashboard, build_task_dashboard
 from solo.core.project import SoloProject
 from solo.utils.ui import heading, print_json
 
@@ -27,6 +27,7 @@ def build_status(project: SoloProject, include_all: bool = False) -> Dict[str, A
     return {
         "project": config.project.__dict__,
         "solo_protocol_version": config.solo_protocol_version,
+        "protocol": build_protocol_dashboard(config),
         "paths": {
             "root": str(project.path),
             "solo_dir": str(project.solo_dir),

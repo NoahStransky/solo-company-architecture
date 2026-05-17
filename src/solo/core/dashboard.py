@@ -4,10 +4,26 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from solo.core.config import SoloConfig
+from solo.core.migration import migration_plan
 from solo.core.task import COMPLETED, FAILED, IN_PROGRESS, PENDING, SKIPPED, Task
 
 
 ACTIVE_STATUSES = {PENDING, IN_PROGRESS, "blocked", "waiting_approval"}
+
+
+def build_protocol_dashboard(config: SoloConfig) -> Dict[str, Any]:
+    """Return protocol compatibility fields for solo-os and other dashboards."""
+    plan = migration_plan(config.to_dict())
+    return {
+        "current_version": plan["from_version"],
+        "supported_version": plan["to_version"],
+        "compatible": plan["ok"] and not plan["needed"],
+        "migration_needed": plan["needed"],
+        "migration_available": plan["needed"] and plan["ok"],
+        "migration_error": plan["error"],
+        "migration_steps": plan["steps"],
+    }
 
 
 def build_task_dashboard(task: Task, events: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:

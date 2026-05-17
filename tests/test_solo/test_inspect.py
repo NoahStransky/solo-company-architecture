@@ -21,6 +21,10 @@ def test_inspect_json_returns_task_context():
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
         assert payload["project"]["name"] == "inspect-demo"
+        assert payload["protocol"]["current_version"] == 1
+        assert payload["protocol"]["supported_version"] == 1
+        assert payload["protocol"]["compatible"] is True
+        assert payload["protocol"]["migration_needed"] is False
         assert payload["task"]["id"] == task_id
         assert payload["dashboard"]["task_id"] == task_id
         assert payload["dashboard"]["current_phase"] == "cto_breakdown"

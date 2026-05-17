@@ -17,6 +17,15 @@ def test_status_json_is_solo_os_friendly():
         payload = json.loads(result.output)
         assert payload["project"]["name"] == "status-demo"
         assert payload["solo_protocol_version"] == 1
+        assert payload["protocol"] == {
+            "current_version": 1,
+            "supported_version": 1,
+            "compatible": True,
+            "migration_needed": False,
+            "migration_available": False,
+            "migration_error": "",
+            "migration_steps": [],
+        }
         assert payload["paths"]["root"]
         assert payload["paths"]["config"].endswith(".solo/config.yaml")
         assert payload["paths"]["events"].endswith(".solo/state/events.jsonl")

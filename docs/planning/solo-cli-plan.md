@@ -628,6 +628,12 @@ Adapter 建议：
 - `solo validate --json` 遇到不支持的 protocol version 时返回结构化错误和 migration hint。
 - 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_migrate.py tests/test_solo/test_validate.py tests/test_solo/test_cli_commands.py -q` 通过，`27 passed`。
 
+继续收敛 dashboard protocol compatibility：
+
+- `solo status --json` 新增 `protocol` 字段，包含 current/supported version、compatible、migration_needed、migration_available、migration_error 和 migration_steps。
+- `solo inspect --json` 复用同一份 `protocol` 字段，dashboard 不需要分别解析 config。
+- 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_status.py tests/test_solo/test_inspect.py -q` 通过，`8 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -654,6 +660,7 @@ Adapter 建议：
 - setup 查看面和 generic CLI wrapper 端到端验收已补齐，真实 CLI runtime 接入前的合同更稳。
 - `solo status` / `solo inspect` 的人类可读输出已与 dashboard summary 对齐。
 - `solo migrate` 已提供协议升级最小骨架，`validate` 能给 migration hint。
+- `solo status --json` / `solo inspect --json` 已显式暴露 protocol compatibility summary。
 
 ### Progress Snapshot
 
@@ -693,6 +700,7 @@ Adapter 建议：
 | Generic CLI wrapper e2e | Done | 通用 wrapper 已通过 `run --until done` 端到端测试 |
 | Human-readable status/inspect | Done | `solo status` / `solo inspect` 文本输出展示进度、失败原因、artifact 和 recent activity |
 | Protocol migration skeleton | Done | `solo migrate` 支持 check/apply/backup/json，`validate` 会提示 migration |
+| Protocol compatibility JSON | Done | `status --json` / `inspect --json` 暴露 version、supported version 和 migration 状态 |
 
 当前新增能力：
 
@@ -861,11 +869,9 @@ tests/test_solo/
 
 最新推荐实现顺序：
 
-1. 为 `.solo/` 协议补最小 migration 层：`solo migrate --check/--json`、备份、v0 -> v1 默认迁移和 `validate` migration hint。
-2. 继续收敛 protocol compatibility：在 `status --json` / `inspect --json` 输出中显式暴露 protocol version、CLI supported protocol 和 migration 状态。
-3. 增加 task/message/artifact schema 的 fixture 兼容测试，锁住 solo-os dashboard 依赖的字段。
-4. 设计真实 runtime wrapper 的下一层：Codex/Claude Code/Hermes/OpenClaw 仍先走通用 CLI wrapper contract，不做专用 adapter。
-5. 开始 solo-os read-only dashboard 前置协议包：整理 `.solo/` 文件协议、CLI JSON contract 和 dashboard polling 建议。
+1. 增加 task/message/artifact schema 的 fixture 兼容测试，锁住 solo-os dashboard 依赖的字段。
+2. 设计真实 runtime wrapper 的下一层：Codex/Claude Code/Hermes/OpenClaw 仍先走通用 CLI wrapper contract，不做专用 adapter。
+3. 开始 solo-os read-only dashboard 前置协议包：整理 `.solo/` 文件协议、CLI JSON contract 和 dashboard polling 建议。
 
 旧 MVP 闭环仍然保持：
 
