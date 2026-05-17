@@ -634,6 +634,13 @@ Adapter 建议：
 - `solo inspect --json` 复用同一份 `protocol` 字段，dashboard 不需要分别解析 config。
 - 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_status.py tests/test_solo/test_inspect.py -q` 通过，`8 passed`。
 
+继续补 solo-os contract fixture 测试：
+
+- 新增 `tests/test_solo/test_protocol_contract.py`，使用 template dummy runtime 跑完整 completed flow。
+- 测试锁住 `status --json` / `inspect --json` 的 protocol、paths、execution、dashboard task、progress 和 artifact manifest 字段。
+- 测试锁住 `tasks.json`、`messages.jsonl`、handoff `details.next_instruction` 和 artifact 指针存在性。
+- 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_protocol_contract.py -q` 通过，`2 passed`。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -661,6 +668,7 @@ Adapter 建议：
 - `solo status` / `solo inspect` 的人类可读输出已与 dashboard summary 对齐。
 - `solo migrate` 已提供协议升级最小骨架，`validate` 能给 migration hint。
 - `solo status --json` / `solo inspect --json` 已显式暴露 protocol compatibility summary。
+- solo-os 依赖的 dashboard/task/message/artifact 字段已有 completed-flow contract 测试覆盖。
 
 ### Progress Snapshot
 
@@ -701,6 +709,7 @@ Adapter 建议：
 | Human-readable status/inspect | Done | `solo status` / `solo inspect` 文本输出展示进度、失败原因、artifact 和 recent activity |
 | Protocol migration skeleton | Done | `solo migrate` 支持 check/apply/backup/json，`validate` 会提示 migration |
 | Protocol compatibility JSON | Done | `status --json` / `inspect --json` 暴露 version、supported version 和 migration 状态 |
+| solo-os contract tests | Done | completed dummy flow 锁住 dashboard、task、message 和 artifact manifest 字段 |
 
 当前新增能力：
 
@@ -869,9 +878,8 @@ tests/test_solo/
 
 最新推荐实现顺序：
 
-1. 增加 task/message/artifact schema 的 fixture 兼容测试，锁住 solo-os dashboard 依赖的字段。
-2. 设计真实 runtime wrapper 的下一层：Codex/Claude Code/Hermes/OpenClaw 仍先走通用 CLI wrapper contract，不做专用 adapter。
-3. 开始 solo-os read-only dashboard 前置协议包：整理 `.solo/` 文件协议、CLI JSON contract 和 dashboard polling 建议。
+1. 设计真实 runtime wrapper 的下一层：Codex/Claude Code/Hermes/OpenClaw 仍先走通用 CLI wrapper contract，不做专用 adapter。
+2. 开始 solo-os read-only dashboard 前置协议包：整理 `.solo/` 文件协议、CLI JSON contract 和 dashboard polling 建议。
 
 旧 MVP 闭环仍然保持：
 
