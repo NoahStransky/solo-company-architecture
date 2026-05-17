@@ -87,6 +87,8 @@ After `solo init`, a project has:
 
 `solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, `state/messages.jsonl`, and call `solo status --json`, `solo inspect --json`, or `solo dispatch --json` when it needs structured interaction. `solo status --json` and `solo inspect --json` expose protocol compatibility, project paths, execution adapter capabilities, phase progress, agent progress, work package progress, and failed reason fields for dashboard registration.
 
+The read-only dashboard contract is documented in `docs/protocol/solo-os-dashboard-contract.md`.
+
 ## Runtime Shape
 
 Default feature flow:

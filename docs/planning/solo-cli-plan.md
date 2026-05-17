@@ -641,6 +641,12 @@ Adapter 建议：
 - 测试锁住 `tasks.json`、`messages.jsonl`、handoff `details.next_instruction` 和 artifact 指针存在性。
 - 当前 targeted 验证：`docker compose run --rm test pytest tests/test_solo/test_protocol_contract.py -q` 通过，`2 passed`。
 
+继续整理 solo-os read-only dashboard contract：
+
+- 新增 `docs/protocol/solo-os-dashboard-contract.md`，明确 solo-os 只能读 `.solo/` 文件和调用公开 `solo ... --json`，不 import `solo.core.*`。
+- 文档覆盖 required files、preferred CLI reads、protocol compatibility、dashboard payload、polling、message semantics、artifact kinds、health checks 和测试入口。
+- README 已链接该 contract，方便后续 solo-os 项目直接按协议实现 dashboard。
+
 当前状态：
 
 - MVP 协议闭环完成。
@@ -669,6 +675,7 @@ Adapter 建议：
 - `solo migrate` 已提供协议升级最小骨架，`validate` 能给 migration hint。
 - `solo status --json` / `solo inspect --json` 已显式暴露 protocol compatibility summary。
 - solo-os 依赖的 dashboard/task/message/artifact 字段已有 completed-flow contract 测试覆盖。
+- solo-os read-only dashboard contract 已独立成文档，当前项目和未来 control plane 的边界更清楚。
 
 ### Progress Snapshot
 
@@ -710,6 +717,7 @@ Adapter 建议：
 | Protocol migration skeleton | Done | `solo migrate` 支持 check/apply/backup/json，`validate` 会提示 migration |
 | Protocol compatibility JSON | Done | `status --json` / `inspect --json` 暴露 version、supported version 和 migration 状态 |
 | solo-os contract tests | Done | completed dummy flow 锁住 dashboard、task、message 和 artifact manifest 字段 |
+| solo-os dashboard contract doc | Done | `docs/protocol/solo-os-dashboard-contract.md` 记录 read-only dashboard 协议 |
 
 当前新增能力：
 
@@ -879,7 +887,7 @@ tests/test_solo/
 最新推荐实现顺序：
 
 1. 设计真实 runtime wrapper 的下一层：Codex/Claude Code/Hermes/OpenClaw 仍先走通用 CLI wrapper contract，不做专用 adapter。
-2. 开始 solo-os read-only dashboard 前置协议包：整理 `.solo/` 文件协议、CLI JSON contract 和 dashboard polling 建议。
+2. 基于 read-only dashboard contract 开始 solo-os 项目的最小 dashboard 骨架。
 
 旧 MVP 闭环仍然保持：
 
