@@ -6,6 +6,7 @@ import click
 
 from solo.core.config import save_config
 from solo.core.project import SoloProject
+from solo.core.tooling import sync_tooling
 from solo.utils.ui import success
 
 
@@ -27,7 +28,9 @@ def init(template: str, yes: bool, name: str, description: str):
     if description:
         config.project.description = description
     save_config(config, project.config_path)
+    tooling = sync_tooling(project)
     success(f"created {project.solo_dir}")
     success("created .solo/state/tasks.json")
     success("created .solo/state/events.jsonl")
+    success(f"synced {len(tooling.written)} tooling files")
     click.echo("Next: solo dispatch \"Describe the work\"")

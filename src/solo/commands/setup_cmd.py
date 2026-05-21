@@ -7,6 +7,7 @@ import click
 
 from solo.core.config import AgentConfig, CommandRuntimeConfig, MCPServerConfig, ProviderConfig, RuntimeProfileConfig, SkillConfig, save_config
 from solo.core.project import SoloProject
+from solo.core.tooling import doctor_tooling, sync_tooling
 from solo.utils.ui import print_json, success
 
 
@@ -132,6 +133,7 @@ def setup_runtime(
 
     save_config(config, project.config_path)
     success(f"saved runtime profile {name}")
+    _sync_tooling_after_config_change(project)
     if set_default:
         click.echo(f"Default runtime: {name}")
     for role in roles:
@@ -185,6 +187,7 @@ def setup_agent(
     )
     save_config(config, project.config_path)
     success(f"saved agent {role}")
+    _sync_tooling_after_config_change(project)
 
 
 @setup.command("provider")
@@ -211,6 +214,7 @@ def setup_provider(
     )
     save_config(config, project.config_path)
     success(f"saved provider {name}")
+    _sync_tooling_after_config_change(project)
 
 
 @setup.command("mcp")
@@ -240,6 +244,7 @@ def setup_mcp(
     )
     save_config(config, project.config_path)
     success(f"saved mcp server {name}")
+    _sync_tooling_after_config_change(project)
 
 
 @setup.command("skill")
@@ -258,6 +263,55 @@ def setup_skill(name: str, skill_path: str, description: str, create_file: bool)
         target.write_text(f"# {name}\n\n{description}\n", encoding="utf-8")
     save_config(config, project.config_path)
     success(f"saved skill {name}")
+    _sync_tooling_after_config_change(project)
+
+
+@setup.group("tooling")
+def setup_tooling():
+    """Sync generated Codex and Claude Code project files."""
+
+
+@setup_tooling.command("sync")
+@click.option("--target", type=click.Choice(["all", "codex", "claude"]), default="all", show_default=True, help="Tooling target to render.")
+@click.option("--force", is_flag=True, help="Overwrite unmanaged target files.")
+@click.option("--json", "as_json", is_flag=True, help="Print structured JSON.")
+def setup_tooling_sync(target: str, force: bool, as_json: bool):
+    """Render AGENTS.md, CLAUDE.md, MCP, skills, and exported config files."""
+    project = _require_project()
+    try:
+        result = sync_tooling(project, target=target, force=force)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if as_json:
+        print_json(result.to_dict())
+        return
+    success(f"synced {len(result.written)} tooling files")
+    if result.skipped:
+        click.echo("Skipped unmanaged files:")
+        for path in result.skipped:
+            click.echo(f"  {path}")
+
+
+@setup_tooling.command("doctor")
+@click.option("--target", type=click.Choice(["all", "codex", "claude"]), default="all", show_default=True, help="Tooling target to check.")
+@click.option("--json", "as_json", is_flag=True, help="Print structured JSON.")
+def setup_tooling_doctor(target: str, as_json: bool):
+    """Check whether generated tooling files are present and managed by Solo."""
+    project = _require_project()
+    result = doctor_tooling(project, target=target)
+    if as_json:
+        print_json(result.to_dict())
+        return
+    if result.ok:
+        success(f"tooling ok ({len(result.checked)} files checked)")
+        return
+    for path in result.missing:
+        click.echo(f"missing: {path}")
+    for path in result.unmanaged:
+        click.echo(f"unmanaged: {path}")
+    for error in result.errors:
+        click.echo(f"error: {error}")
+    raise click.ClickException("Tooling check failed.")
 
 
 def _parse_env(items: Iterable[str]) -> Dict[str, str]:
@@ -279,6 +333,19 @@ def _require_project() -> SoloProject:
     return project
 
 
+def _sync_tooling_after_config_change(project: SoloProject) -> None:
+    try:
+        result = sync_tooling(project)
+    except ValueError as exc:
+        click.echo(f"tooling sync skipped: {exc}")
+        return
+    success(f"synced {len(result.written)} tooling files")
+    if result.skipped:
+        click.echo("Skipped unmanaged tooling files:")
+        for path in result.skipped:
+            click.echo(f"  {path}")
+
+
 def _setup_index(config_data: Dict[str, Any]) -> Dict[str, list]:
     return {
         "agents": sorted(config_data.get("agents", {}).keys()),
@@ -286,6 +353,7 @@ def _setup_index(config_data: Dict[str, Any]) -> Dict[str, list]:
         "runtimes": sorted(config_data.get("runtime_profiles", {}).keys()),
         "mcp_servers": sorted(config_data.get("mcp_servers", {}).keys()),
         "skills": sorted(config_data.get("skills", {}).keys()),
+        "tooling_targets": ["codex", "claude"],
     }
 
 

@@ -684,6 +684,20 @@ Adapter 建议：
 - solo-os read-only dashboard contract 已独立成文档，当前项目和未来 control plane 的边界更清楚。
 - 真实 agent CLI 接入策略已收敛到通用 wrapper，不复制各工具自己的 setup surface。
 
+#### 2026-05-21
+
+继续推进 Codex / Claude Code 子 Agent 配置集中管理：
+
+- 新增 `.solo/tooling/manifest.yaml`，把 Codex / Claude Code 入口文件、rules、commands、默认 agents 和 skills 纳入协议模板。
+- 新增 `solo.core.tooling`，从 `.solo/config.yaml`、`.solo/agents/`、`.solo/skills/`、`.solo/tooling/` 生成子工具配置。
+- `solo init` 会自动同步 `AGENTS.md`、`CLAUDE.md`、`.claude/CLAUDE.md`、`.claude/settings.json`、`.claude/agents/*.md`、`.claude/skills/*/SKILL.md`、`.claude/commands/*.md`、`.mcp.json`、`.solo/generated/codex/default/config.toml` 和 Codex command 导出。
+- 新增 `solo setup tooling sync` / `solo setup tooling doctor`，支持 `--target codex|claude|all`、`--force` 和 `--json`。
+- `solo setup agent/provider/mcp/skill/runtime` 保存配置后会自动运行 tooling sync，避免改完模型、MCP 或 skill 后忘记同步 Codex / Claude Code 文件。
+- `solo validate` 已接入 tooling doctor，会报告缺失的 generated tooling 文件和未带 Solo marker 的 unmanaged 文件。
+- 生成文件带有 Solo marker；默认只覆盖 Solo 管理的文件，遇到用户手写的入口文件会跳过并由 doctor 标记 unmanaged。
+- README 已补充 child-agent tooling sync 使用方式。
+- 当前验证：`docker compose run --rm test` 通过，`84 passed`。
+
 ### Progress Snapshot
 
 | Step | 状态 | 说明 |
@@ -726,6 +740,7 @@ Adapter 建议：
 | solo-os contract tests | Done | completed dummy flow 锁住 dashboard、task、message 和 artifact manifest 字段 |
 | solo-os dashboard contract doc | Done | `docs/protocol/solo-os-dashboard-contract.md` 记录 read-only dashboard 协议 |
 | Runtime wrapper integration doc | Done | `docs/protocol/runtime-wrapper-integration.md` 记录真实 CLI runtime 接入策略 |
+| Child-agent tooling sync | Done | `.solo/tooling` manifest、init 自动同步、setup 配置后自动同步、`setup tooling sync/doctor`、`validate` tooling 检查已实现，并通过全量容器测试 |
 
 当前新增能力：
 

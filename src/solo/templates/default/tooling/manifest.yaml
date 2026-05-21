@@ -1,0 +1,50 @@
+version: 1
+
+targets:
+  codex:
+    enabled: true
+    agents_md: AGENTS.md
+    config: .solo/generated/codex/default/config.toml
+    commands_dir: .solo/generated/codex/default/commands
+  claude:
+    enabled: true
+    root_memory: CLAUDE.md
+    project_memory: .claude/CLAUDE.md
+    settings: .claude/settings.json
+    agents_dir: .claude/agents
+    skills_dir: .claude/skills
+    commands_dir: .claude/commands
+    mcp: .mcp.json
+
+profiles:
+  default:
+    targets:
+      - codex
+      - claude
+    agents:
+      - secretary
+      - cto
+      - dev
+      - qa
+    skills:
+      - planning
+      - architecture
+      - implementation
+      - testing
+      - code-review
+      - research
+
+rules:
+  - path: tooling/rules/project.md
+  - path: tooling/rules/secretary.md
+  - path: tooling/rules/cto.md
+  - path: tooling/rules/dev.md
+  - path: tooling/rules/qa.md
+
+commands:
+  review:
+    description: Review the current Solo task, diff, or phase output.
+    path: tooling/commands/review.md
+  fix:
+    description: Fix a scoped issue while preserving Solo artifacts and state.
+    path: tooling/commands/fix.md

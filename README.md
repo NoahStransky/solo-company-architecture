@@ -75,6 +75,7 @@ After `solo init`, a project has:
 .solo/
 ├── config.yaml
 ├── agents/
+├── tooling/
 ├── workflows/
 ├── state/
 │   ├── tasks.json
@@ -88,6 +89,32 @@ After `solo init`, a project has:
 `solo-os` should treat this as a stable file protocol. It can read `config.yaml`, `state/tasks.json`, `state/events.jsonl`, `state/messages.jsonl`, and call `solo status --json`, `solo inspect --json`, or `solo dispatch --json` when it needs structured interaction. `solo status --json` and `solo inspect --json` expose protocol compatibility, project paths, execution adapter capabilities, phase progress, agent progress, work package progress, and failed reason fields for dashboard registration.
 
 The read-only dashboard contract is documented in `docs/protocol/solo-os-dashboard-contract.md`. Runtime wrapper guidance for Codex, Claude Code, Hermes, and OpenClaw is documented in `docs/protocol/runtime-wrapper-integration.md`.
+
+## Child-Agent Tooling Sync
+
+`solo init` also creates a central tooling manifest at `.solo/tooling/manifest.yaml` and immediately syncs generated files for local child-agent CLIs:
+
+```text
+AGENTS.md
+CLAUDE.md
+.claude/CLAUDE.md
+.claude/settings.json
+.claude/agents/*.md
+.claude/skills/*/SKILL.md
+.claude/commands/*.md
+.mcp.json
+.solo/generated/codex/default/config.toml
+.solo/generated/codex/default/commands/*.md
+```
+
+The source of truth stays in `.solo/config.yaml`, `.solo/agents/`, `.solo/skills/`, and `.solo/tooling/`. After changing providers, models, MCP servers, skills, or tooling rules, regenerate the Codex and Claude Code files:
+
+```bash
+solo setup tooling sync
+solo setup tooling doctor
+```
+
+`solo setup agent/provider/mcp/skill/runtime` automatically runs tooling sync after saving config, so normal setup flows keep child-agent files fresh. Generated files include a Solo marker. Sync overwrites managed files, skips unmanaged hand-written files by default, and supports `--force` when you intentionally want Solo to take ownership of the target file.
 
 ## Runtime Shape
 
@@ -250,11 +277,13 @@ solo setup list --json
 solo setup show agent dev --json
 solo setup show runtime generic-cli --json
 solo setup show execution --json
+solo setup tooling sync
+solo setup tooling doctor --json
 ```
 
 ## Protocol Validation
 
-Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, JSON/JSONL state files, message pointers, phase/task consistency, runtime reports, and structured artifact contracts.
+Use `solo validate` to check whether the local `.solo/` protocol directory is healthy. It verifies required files, contract schemas, config references, workflow phase dependencies, JSON/JSONL state files, message pointers, phase/task consistency, runtime reports, generated child-agent tooling files, and structured artifact contracts.
 
 ```bash
 solo validate
@@ -294,6 +323,8 @@ solo setup agent
 solo setup provider
 solo setup mcp
 solo setup skill
+solo setup tooling sync
+solo setup tooling doctor
 solo validate
 ```
 

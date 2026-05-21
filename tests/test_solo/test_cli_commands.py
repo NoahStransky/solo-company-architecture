@@ -21,6 +21,7 @@ from solo.cli import main
         (["start"], "No .solo project found"),
         (["validate"], "No .solo project found"),
         (["setup", "runtime", "local", "--command", "echo"], "No .solo project found"),
+        (["setup", "tooling", "sync"], "No .solo project found"),
     ],
 )
 def test_project_commands_require_initialized_solo_project(args, expected):

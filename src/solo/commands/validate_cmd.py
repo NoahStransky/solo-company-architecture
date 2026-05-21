@@ -11,6 +11,7 @@ from solo.core.dispatcher import available_adapters
 from solo.core.migration import find_solo_root, load_raw_config, migration_plan
 from solo.core.project import SoloProject
 from solo.core.task import COMPLETED, FAILED, IN_PROGRESS, PENDING, SKIPPED
+from solo.core.tooling import doctor_tooling
 from solo.core.workflow import Workflow
 from solo.utils.ui import print_json, success
 
@@ -38,6 +39,7 @@ def validate_project(project: SoloProject) -> Dict[str, Any]:
     _check_messages(project, errors)
     _check_artifact_contracts(project, errors)
     _check_runtime_reports(project, errors)
+    _check_tooling(project, errors)
 
     return {
         "ok": not errors,
@@ -299,6 +301,16 @@ def _check_runtime_reports(project: SoloProject, errors: List[Dict[str, str]]) -
         runtime_report = str(details.get("runtime_report", "")).strip()
         if runtime_report and not Path(runtime_report).exists():
             errors.append(_issue("event_missing_runtime_report", f"Event #{index} runtime_report does not exist: {runtime_report}", project.state.events_file))
+
+
+def _check_tooling(project: SoloProject, errors: List[Dict[str, str]]) -> None:
+    result = doctor_tooling(project)
+    for error in result.errors:
+        errors.append(_issue("tooling_error", error, project.solo_dir / "tooling" / "manifest.yaml"))
+    for path in result.missing:
+        errors.append(_issue("missing_tooling_file", f"Missing generated tooling file: {path}", project.path / path))
+    for path in result.unmanaged:
+        errors.append(_issue("unmanaged_tooling_file", f"Tooling file is not managed by Solo marker: {path}", project.path / path))
 
 
 def _load_json_artifact(path: Path, errors: List[Dict[str, str]]) -> Any:

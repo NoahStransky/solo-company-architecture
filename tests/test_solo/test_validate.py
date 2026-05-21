@@ -139,6 +139,21 @@ def test_validate_reports_invalid_runtime_report():
         assert any(issue["code"] == "invalid_runtime_report" for issue in payload["errors"])
 
 
+def test_validate_reports_missing_and_unmanaged_tooling_files():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        Path("AGENTS.md").write_text("custom instructions\n", encoding="utf-8")
+        Path(".claude/commands/review.md").unlink()
+
+        result = runner.invoke(main, ["validate", "--json"])
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        codes = {issue["code"] for issue in payload["errors"]}
+        assert {"unmanaged_tooling_file", "missing_tooling_file"} <= codes
+
+
 def test_validate_reports_protocol_version_migration_hint():
     runner = CliRunner()
     with runner.isolated_filesystem():
