@@ -24,11 +24,14 @@ def inspect_task(project: SoloProject, task_id: Optional[str] = None) -> Dict[st
         for event in project.state.load_events()
         if event.get("task_id") == task.id
     ]
+    artifacts = _list_artifacts(artifact_dir)
+    dashboard = build_task_dashboard(task, events=events)
     return {
         "project": config.project.__dict__,
         "protocol": build_protocol_dashboard(config),
         "task": task.to_dict(),
-        "dashboard": build_task_dashboard(task, events=events),
+        "dashboard": dashboard,
+        "handoff": _build_handoff(task, dashboard, artifacts),
         "paths": {
             "root": str(project.path),
             "solo_dir": str(project.solo_dir),
@@ -36,7 +39,7 @@ def inspect_task(project: SoloProject, task_id: Optional[str] = None) -> Dict[st
             "events": str(project.state.events_file),
             "messages": str(project.state.messages_file),
         },
-        "artifacts": _list_artifacts(artifact_dir),
+        "artifacts": artifacts,
         "events": events,
         "messages": project.state.load_messages(task_id=task.id),
     }
@@ -86,9 +89,43 @@ def _artifact_kind(path: Path) -> str:
         return "work_packages"
     if name == "task.json":
         return "task_snapshot"
+    if "context" in path.parts:
+        return "context"
     if name.endswith("_output.md") or name.endswith("_output.json"):
         return "output"
     return path.suffix.lstrip(".") or "file"
+
+
+def _build_handoff(task: Task, dashboard: Dict[str, Any], artifacts: list) -> Dict[str, Any]:
+    artifact_summary = [
+        {
+            "kind": artifact["kind"],
+            "relative_path": artifact["relative_path"],
+            "path": artifact["path"],
+            "size_bytes": artifact["size_bytes"],
+        }
+        for artifact in artifacts
+        if artifact["kind"] in {"context", "work_packages", "agent_result", "qa_report", "output", "runtime"}
+    ]
+    latest_results = [result.to_dict() for result in task.phase_results[-8:]]
+    qa_reports = [result for result in latest_results if result.get("verdict")]
+    return {
+        "summary": f"{task.title} [{task.status}]",
+        "task_id": task.id,
+        "title": task.title,
+        "status": task.status,
+        "workflow": task.workflow,
+        "current_phase": task.current_phase,
+        "external": task.external,
+        "context": task.context,
+        "phase_progress": dashboard.get("phase_progress", {}),
+        "agent_progress": dashboard.get("agent_progress", {}),
+        "work_package_progress": dashboard.get("work_package_progress", {}),
+        "failed_reason": dashboard.get("failed_reason"),
+        "phase_results": latest_results,
+        "qa_reports": qa_reports,
+        "artifacts": artifact_summary,
+    }
 
 
 @click.command("inspect")

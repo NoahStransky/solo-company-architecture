@@ -69,6 +69,53 @@ def test_dispatch_direct_role():
         assert payload["package"]["agent_role"] == "cto"
 
 
+def test_dispatch_records_external_metadata_and_context_file():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        Path("dependency-context.md").write_text("Backend contract: GET /billing\n", encoding="utf-8")
+
+        result = runner.invoke(
+            main,
+            [
+                "dispatch",
+                "--json",
+                "--external-id",
+                "XPROJ-20260528-001",
+                "--external-source",
+                "solo-os",
+                "--external-node",
+                "frontend",
+                "--context-file",
+                "dependency-context.md",
+                "Build frontend billing integration",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        task = payload["task"]
+        package = payload["package"]
+        assert task["external"] == {
+            "id": "XPROJ-20260528-001",
+            "source": "solo-os",
+            "node": "frontend",
+        }
+        context_file = task["context"]["files"][0]
+        assert context_file["name"] == "dependency-context.md"
+        assert Path(context_file["artifact"]).read_text(encoding="utf-8") == "Backend contract: GET /billing\n"
+        assert package["external"] == task["external"]
+        assert package["context"] == task["context"]
+        instruction = Path(package["instruction"]).read_text(encoding="utf-8")
+        assert "## External orchestration" in instruction
+        assert "XPROJ-20260528-001" in instruction
+        assert "context/dependency-context.md" in instruction
+
+        state = json.loads(Path(".solo/state/tasks.json").read_text(encoding="utf-8"))
+        assert state["tasks"][0]["external"]["source"] == "solo-os"
+        assert state["tasks"][0]["context"]["files"][0]["relative_path"] == "context/dependency-context.md"
+
+
 def test_dispatch_rejects_unknown_adapter_and_role():
     runner = CliRunner()
     with runner.isolated_filesystem():

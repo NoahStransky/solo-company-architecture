@@ -78,6 +78,8 @@ class PackageDispatcher(ExecutionAdapter):
             "task_id": task.id,
             "task_title": task.title,
             "task_description": task.description,
+            "external": task.external,
+            "context": task.context,
             "phase": phase.to_dict(),
             "agent_role": role,
             "agent_prompt_path": str(agent.prompt_path),
@@ -111,6 +113,8 @@ class PackageDispatcher(ExecutionAdapter):
             "mcp_servers": mcp_servers,
             "skills": skills,
             "planned_dev_agents": task.planned_dev_agents,
+            "external": task.external,
+            "context": task.context,
             "agent_instances": [instance.to_dict() for instance in task.agent_instances],
             "work_packages": [package.to_dict() for package in task.work_packages],
             "phase_results": [result.to_dict() for result in task.phase_results],
@@ -173,6 +177,8 @@ class PackageDispatcher(ExecutionAdapter):
             "## Task description",
             "",
             package["task_description"],
+            "",
+            *(self._external_context_lines(package)),
             "",
             "## Model",
             "",
@@ -256,6 +262,22 @@ class PackageDispatcher(ExecutionAdapter):
             f"- `{item.get('id', '')}`: {item.get('title', '')} - {item.get('description', '')}"
             for item in work_packages
         ]
+
+    def _external_context_lines(self, package: Dict[str, Any]) -> list:
+        lines = []
+        external = package.get("external") or {}
+        if external:
+            lines.extend(["## External orchestration", ""])
+            for key in ("source", "id", "node"):
+                if external.get(key):
+                    lines.append(f"- {key}: `{external[key]}`")
+            lines.append("")
+        context_files = (package.get("context") or {}).get("files") or []
+        if context_files:
+            lines.extend(["## Context files", ""])
+            for item in context_files:
+                lines.append(f"- `{item.get('relative_path') or item.get('artifact')}`")
+        return lines
 
 
 class CommandDispatcher(ExecutionAdapter):

@@ -36,6 +36,46 @@ def test_inspect_json_returns_task_context():
         assert [message["type"] for message in payload["messages"]] == ["request", "assignment"]
         artifact_kinds = {artifact["kind"] for artifact in payload["artifacts"]}
         assert {"input", "instruction", "task_snapshot"} <= artifact_kinds
+        assert payload["handoff"]["task_id"] == task_id
+        assert payload["handoff"]["status"] == "in_progress"
+        assert payload["handoff"]["phase_progress"]["total"] == 6
+
+
+def test_inspect_handoff_includes_external_context_and_artifacts():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+        Path("upstream.md").write_text("Upstream API contract\n", encoding="utf-8")
+        dispatch = runner.invoke(
+            main,
+            [
+                "dispatch",
+                "--json",
+                "--external-id",
+                "XPROJ-1",
+                "--external-source",
+                "solo-os",
+                "--external-node",
+                "frontend",
+                "--context-file",
+                "upstream.md",
+                "Build handoff fixture",
+            ],
+        )
+        assert dispatch.exit_code == 0, dispatch.output
+        task_id = json.loads(dispatch.output)["task"]["id"]
+        artifact_dir = Path(".solo/artifacts") / task_id
+        (artifact_dir / "cto_breakdown_output.md").write_text("Architecture result", encoding="utf-8")
+
+        result = runner.invoke(main, ["inspect", "--task", task_id, "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        handoff = payload["handoff"]
+        assert handoff["external"] == {"id": "XPROJ-1", "source": "solo-os", "node": "frontend"}
+        assert handoff["context"]["files"][0]["relative_path"] == "context/upstream.md"
+        assert {artifact["kind"] for artifact in handoff["artifacts"]} >= {"context", "output"}
+        assert any(artifact["relative_path"] == "context/upstream.md" for artifact in payload["artifacts"])
 
 
 def test_inspect_text_includes_dashboard_summary_and_recent_activity():

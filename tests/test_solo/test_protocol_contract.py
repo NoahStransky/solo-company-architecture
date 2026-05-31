@@ -69,10 +69,19 @@ def test_solo_os_dashboard_json_contract_fields_are_stable():
         assert {"total", "by_status", "failed_agents", "percent"} <= set(dashboard_task["agent_progress"])
         assert {"total", "by_status", "percent"} <= set(dashboard_task["work_package_progress"])
 
-        assert {"project", "protocol", "task", "dashboard", "paths", "artifacts", "events", "messages"} <= set(inspect_payload)
+        assert {"project", "protocol", "task", "dashboard", "handoff", "paths", "artifacts", "events", "messages"} <= set(inspect_payload)
         assert set(inspect_payload["protocol"]) == PROTOCOL_KEYS
         assert inspect_payload["dashboard"]["task_id"] == task_id
         assert DASHBOARD_TASK_KEYS <= set(inspect_payload["dashboard"])
+        assert {
+            "summary",
+            "task_id",
+            "status",
+            "external",
+            "context",
+            "phase_progress",
+            "artifacts",
+        } <= set(inspect_payload["handoff"])
         assert {"root", "solo_dir", "artifacts_dir", "events", "messages"} <= set(inspect_payload["paths"])
         assert inspect_payload["artifacts"]
         assert {"name", "path", "relative_path", "size_bytes", "kind"} <= set(inspect_payload["artifacts"][0])
@@ -101,6 +110,8 @@ def test_state_message_and_artifact_contract_fields_are_stable():
             "current_phase",
             "phases",
             "planned_dev_agents",
+            "external",
+            "context",
             "work_packages",
             "phase_results",
             "agent_instances",

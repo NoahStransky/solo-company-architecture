@@ -698,6 +698,17 @@ Adapter 建议：
 - README 已补充 child-agent tooling sync 使用方式。
 - 当前验证：`docker compose run --rm test` 通过，`84 passed`。
 
+#### 2026-05-28
+
+继续推进 solo-os 跨项目协议增强：
+
+- `solo dispatch` 新增 `--external-source`、`--external-id`、`--external-node`，子项目 task 可记录自己来自哪个 solo-os cross task / project node。
+- `solo dispatch` 新增 `--context-file`，会把上游依赖上下文复制进 `.solo/artifacts/<task_id>/context/`，并写入 task snapshot / execution package / instruction。
+- `Task` 协议新增 `external` 和 `context` 字段，用于跨项目追踪和上下文传递。
+- `solo inspect --json` 新增 `handoff` 对象，聚合 external/context、progress、failed reason、phase results、QA reports 和关键 artifact manifest，供 solo-os 注入下游项目 prompt。
+- `context` artifact kind 已加入 inspect artifact 分类和 solo-os dashboard contract。
+- 当前验证：`docker compose run --rm test` 通过，`86 passed`。
+
 ### Progress Snapshot
 
 | Step | 状态 | 说明 |
@@ -741,6 +752,7 @@ Adapter 建议：
 | solo-os dashboard contract doc | Done | `docs/protocol/solo-os-dashboard-contract.md` 记录 read-only dashboard 协议 |
 | Runtime wrapper integration doc | Done | `docs/protocol/runtime-wrapper-integration.md` 记录真实 CLI runtime 接入策略 |
 | Child-agent tooling sync | Done | `.solo/tooling` manifest、init 自动同步、setup 配置后自动同步、`setup tooling sync/doctor`、`validate` tooling 检查已实现，并通过全量容器测试 |
+| Cross-project handoff protocol | Done | dispatch external/context-file 和 inspect handoff 已实现，并通过全量容器测试 |
 
 当前新增能力：
 

@@ -21,6 +21,8 @@ class Secretary:
         workflow: Workflow,
         artifacts_dir: Path,
         direct_role: Optional[str] = None,
+        external: Optional[dict] = None,
+        context: Optional[dict] = None,
     ) -> Task:
         task_id = self._new_task_id()
         title = self._make_title(description)
@@ -50,6 +52,8 @@ class Secretary:
             planned_dev_agents=planned_dev_agents,
             agent_instances=self._make_agent_instances(phases),
             artifacts_dir=str(artifacts_dir / task_id),
+            external=external or {},
+            context=context or {},
         )
 
     def estimate_dev_agent_count(self, description: str, phases: List[TaskPhase]) -> int:

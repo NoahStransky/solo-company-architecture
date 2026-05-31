@@ -99,9 +99,37 @@ Each `dashboard.tasks[*]` item contains:
 Use `solo inspect --task <task_id> --json` for detail drawers or task pages. It includes the same `protocol` and `dashboard` summary plus:
 
 - full `task` snapshot,
+- `handoff` summary for downstream project orchestration,
 - task-scoped `events`,
 - task-scoped `messages`,
 - `artifacts` manifest with name, path, relative_path, size_bytes, kind.
+
+## Cross-Project Handoff
+
+`solo-os` may pass its cross-task identity into a child project during dispatch:
+
+```bash
+solo dispatch --json \
+  --external-source solo-os \
+  --external-id XPROJ-20260528-001 \
+  --external-node frontend \
+  --context-file dependency-context.md \
+  "Build frontend integration"
+```
+
+The child task stores:
+
+- `task.external`: external source/id/node.
+- `task.context.files[*]`: copied context artifacts under `.solo/artifacts/<task_id>/context/`.
+
+`solo inspect --json` exposes a compact `handoff` object for downstream projects:
+
+- task id, title, status, workflow, current phase.
+- external metadata and context file pointers.
+- phase, agent, and work package progress.
+- failed reason when present.
+- recent phase results and QA reports.
+- key artifacts such as context files, outputs, work packages, QA reports, agent results, and runtime reports.
 
 ## Polling
 
@@ -153,6 +181,7 @@ Rules for dashboard links:
 | `work_packages` | CTO work package breakdown. |
 | `task_snapshot` | Task snapshot written into artifacts. |
 | `output` | Generic phase output. |
+| `context` | External or dependency context copied during dispatch. |
 
 Unknown files should still be shown with their extension-derived kind.
 

@@ -143,6 +143,8 @@ class Task:
     phases: List[TaskPhase]
     artifacts_dir: str
     planned_dev_agents: int = 0
+    external: Dict[str, Any] = field(default_factory=dict)
+    context: Dict[str, Any] = field(default_factory=dict)
     work_packages: List[WorkPackage] = field(default_factory=list)
     phase_results: List[PhaseResult] = field(default_factory=list)
     agent_instances: List[AgentInstance] = field(default_factory=list)
@@ -161,6 +163,8 @@ class Task:
             phases=[TaskPhase.from_dict(item) for item in data.get("phases", [])],
             artifacts_dir=data.get("artifacts_dir", ""),
             planned_dev_agents=int(data.get("planned_dev_agents", 0)),
+            external=dict(data.get("external") or {}),
+            context=dict(data.get("context") or {}),
             work_packages=[WorkPackage.from_dict(item) for item in data.get("work_packages", [])],
             phase_results=[PhaseResult.from_dict(item) for item in data.get("phase_results", [])],
             agent_instances=[AgentInstance.from_dict(item) for item in data.get("agent_instances", [])],
@@ -178,6 +182,8 @@ class Task:
             "current_phase": self.current_phase,
             "phases": [phase.to_dict() for phase in self.phases],
             "planned_dev_agents": self.planned_dev_agents,
+            "external": self.external,
+            "context": self.context,
             "work_packages": [package.to_dict() for package in self.work_packages],
             "phase_results": [result.to_dict() for result in self.phase_results],
             "agent_instances": [instance.to_dict() for instance in self.agent_instances],

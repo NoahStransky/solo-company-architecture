@@ -90,6 +90,19 @@ After `solo init`, a project has:
 
 The read-only dashboard contract is documented in `docs/protocol/solo-os-dashboard-contract.md`. Runtime wrapper guidance for Codex, Claude Code, Hermes, and OpenClaw is documented in `docs/protocol/runtime-wrapper-integration.md`.
 
+For cross-project orchestration, `solo-os` can attach its own identity and dependency context during dispatch:
+
+```bash
+solo dispatch --json \
+  --external-source solo-os \
+  --external-id XPROJ-20260528-001 \
+  --external-node frontend \
+  --context-file dependency-context.md \
+  "Build frontend billing integration"
+```
+
+The task snapshot stores `external` and `context`, the context file is copied into task artifacts, and `solo inspect --json` exposes a compact `handoff` object for downstream project prompts.
+
 ## Child-Agent Tooling Sync
 
 `solo init` also creates a central tooling manifest at `.solo/tooling/manifest.yaml` and immediately syncs generated files for local child-agent CLIs:
