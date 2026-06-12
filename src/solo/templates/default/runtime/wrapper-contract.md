@@ -1,6 +1,6 @@
 # Solo Runtime Wrapper Contract
 
-Runtime wrappers let `solo` hand a prepared agent package to an external tool such as Codex, Claude Code, Hermes, OpenClaw, or a local script.
+Runtime wrappers let `solo` hand a prepared agent package to an external tool such as Codex, Claude Code, Hermes, OpenClaw, or a local script. The external tool owns model calls, sessions, subagents, goal loops, memory, and approvals. Solo owns the phase contract, artifacts, state, and dashboard-readable handoff.
 
 The wrapper is launched by the `command` adapter. It receives:
 
@@ -50,9 +50,9 @@ Write `work_packages.json`:
 }
 ```
 
-### Dev Agent
+### Implementation Agent
 
-For agent pools, write `<agent_instance>_agent_result.json`:
+For a single implementation phase, write `<phase>_agent_result.json` or `<phase>_result.json`. For legacy agent pools, write `<agent_instance>_agent_result.json`:
 
 ```json
 {

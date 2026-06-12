@@ -2,9 +2,9 @@
 
 `solo` turns one repository into a project-level Solo Company workspace.
 
-You are the CEO. `solo start` opens a conversation with the default Secretary agent. The Secretary turns your intent into a task, asks the CTO to break it down, and prepares work for a bounded pool of Dev agents.
+You are the CEO. `solo start` opens a conversation with the default Secretary agent. The Secretary turns your intent into a task, asks the CTO to break it down, and prepares execution packages that Codex, Claude Code, Hermes, OpenClaw, or another runtime can carry out.
 
-The first implementation is protocol-first: it creates `.solo/` state, workflows, agent prompts, and execution packages that future runtimes and `solo-os` can consume.
+The implementation is protocol-first: it creates `.solo/` state, workflows, agent prompts, and execution packages that external runtimes and `solo-os` can consume. Solo is not trying to replace Codex, Claude Code, Hermes, or other agent harnesses; it gives them a durable project protocol, handoff surface, and dashboard-readable state.
 
 ## Install For Development
 
@@ -137,20 +137,22 @@ Default feature flow:
 CEO request
   -> Secretary
   -> CTO breakdown
-  -> bounded Dev agent pool
+  -> implementation phase
   -> QA
   -> CTO review
   -> Secretary report
 ```
 
-Dev agent count is estimated from task size and capped by:
+Solo keeps phase state, mailbox messages, work packages, artifacts, failure status, and retry/reopen semantics. It does not need to own the internal team model of a runtime. Codex or Claude Code may use `/goal`, subagents, agent teams, or workflows inside one Solo phase, then write the structured result artifact back to `.solo/artifacts/<task_id>/`.
+
+Legacy Solo agent-pool fields remain in the protocol for compatibility with existing tasks and tests:
 
 ```yaml
 delegation:
   max_parallel_dev_agents: 3
 ```
 
-Agent communication uses a durable mailbox in `.solo/state/messages.jsonl`. Messages only store routing metadata and artifact pointers; large task briefs, instructions, runtime output, implementation reports, and QA reports stay in `.solo/artifacts/<task_id>/`. For handoffs, `artifact` points to an existing sender result when one exists, while `details.next_instruction` points to the next phase package. Agent pools are expanded to concrete recipients and execution packages such as `dev-1_input.json` / `dev-1_instruction.md`; structured dev results update their assigned work package status.
+Agent communication uses a durable mailbox in `.solo/state/messages.jsonl`. Messages only store routing metadata and artifact pointers; large task briefs, instructions, runtime output, implementation reports, and QA reports stay in `.solo/artifacts/<task_id>/`. For handoffs, `artifact` points to an existing sender result when one exists, while `details.next_instruction` points to the next phase package. If a workflow still uses an agent pool, Solo records concrete recipients and per-agent package paths for compatibility, but new integrations should prefer the external runtime's native subagent/team mechanism within the implementation phase.
 
 Dev results can update work package status with:
 
@@ -206,7 +208,7 @@ agents:
 
 The default `package` adapter writes execution packages into `.solo/artifacts/<task_id>/`.
 
-Use runtime profiles when you want agents to share reusable execution settings without copying every tool-specific option into each agent:
+Use runtime profiles when you want agents to share reusable launch settings without copying every tool-specific option into each agent:
 
 ```yaml
 execution:
@@ -234,6 +236,8 @@ Create or update profiles from the CLI:
 solo setup runtime local-codex --preset codex --for dev --for qa
 solo setup runtime local-wrapper --command ./scripts/solo-runtime --arg "{instruction}" --set-default
 ```
+
+Built-in presets are intentionally small: `package`, `codex`, and `claude-code`. For Hermes, OpenClaw, or any other harness, use an explicit `--command` wrapper so Solo does not pretend to own that tool's setup, memory, session, or orchestration model.
 
 Other common configuration can also be managed without editing YAML by hand:
 
@@ -263,9 +267,9 @@ solo setup agent dev \
   --mcp local-files
 ```
 
-The generic `command` adapter can hand the prepared package to Hermes, OpenClaw, Codex, Claude Code, or a local wrapper script. `command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{agent_instance}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_AGENT_INSTANCE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
+The generic `command` adapter can hand the prepared package to Codex, Claude Code, Hermes, OpenClaw, or a local wrapper script. `command.args` supports `{task_id}`, `{phase}`, `{agent_role}`, `{agent_instance}`, `{input}`, `{instruction}`, and `{output_dir}` placeholders. The command also receives `SOLO_TASK_ID`, `SOLO_PHASE`, `SOLO_AGENT_ROLE`, `SOLO_AGENT_INSTANCE`, `SOLO_PACKAGE_INPUT`, `SOLO_PACKAGE_INSTRUCTION`, and `SOLO_OUTPUT_DIR` environment variables.
 
-For agent pool phases, the command adapter runs once per agent instance and passes the instance-specific package paths, such as `dev-1_input.json` and `dev-1_instruction.md`. Runtime reports are written per agent, plus an aggregate phase runtime report.
+For legacy agent pool phases, the command adapter can still run once per agent instance and pass the instance-specific package paths, such as `dev-1_input.json` and `dev-1_instruction.md`. New Codex and Claude Code wrappers should normally pass a single phase instruction and let the runtime decide whether to use `/goal`, subagents, agent teams, or dynamic workflows internally.
 
 Command execution metadata is written to `.solo/artifacts/<task_id>/<phase>_runtime.json`; `events.jsonl` stores a lightweight pointer and return code for dashboards.
 

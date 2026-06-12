@@ -1,10 +1,23 @@
 # Runtime Wrapper Integration
 
-Solo should integrate real agent CLIs through the generic `command` adapter first. Codex, Claude Code, Hermes, and OpenClaw all remain external runtimes from Solo's point of view.
+Solo integrates real agent CLIs as external runtimes. Codex, Claude Code, Hermes, OpenClaw, and similar tools own their model calls, subagents, sessions, memory, and internal orchestration. Solo owns the durable project protocol around them: task state, phase handoffs, artifacts, validation, and `solo-os` dashboard fields.
+
+## What Solo Does Not Own
+
+Do not duplicate mature runtime features inside Solo:
+
+- model-provider API calling,
+- Codex or Claude Code subagent/team scheduling,
+- `/goal` evaluator loops,
+- dynamic workflow engines,
+- long-lived runtime memory,
+- tool-specific approval UX.
+
+Solo may pass a goal, acceptance criteria, and artifact contract to a runtime. The runtime decides whether to execute that with one agent, subagents, an agent team, or a workflow.
 
 ## Why Generic Wrapper First
 
-Special adapters should wait until there is a proven need for tool-specific behavior. The generic wrapper path keeps Solo small:
+The generic wrapper path keeps Solo small:
 
 - Agent model/provider config stays in `.solo/config.yaml`.
 - Runtime launch config stays in `runtime_profiles`.
@@ -64,7 +77,7 @@ solo setup runtime claude-code \
   --set-default
 ```
 
-For Hermes/OpenClaw, prefer a tiny project-local wrapper script if their CLI needs setup files, sessions, or non-stdin input:
+For Hermes, OpenClaw, or any other non-built-in harness, use a project-local wrapper script if the CLI needs setup files, sessions, or non-stdin input:
 
 ```bash
 solo setup runtime hermes-local \
@@ -74,6 +87,24 @@ solo setup runtime hermes-local \
 ```
 
 That script still reads Solo's environment variables and writes Solo's structured artifacts.
+
+## Goal-Aware Wrappers
+
+When an external runtime has a native goal loop, map Solo's phase acceptance criteria into that runtime instead of reimplementing the loop in Solo.
+
+Claude Code example:
+
+```bash
+claude -p "/goal $(cat \"$SOLO_PACKAGE_INSTRUCTION\")"
+```
+
+Codex example:
+
+```bash
+codex exec "/goal $(cat \"$SOLO_PACKAGE_INSTRUCTION\")"
+```
+
+The exact command should live in a wrapper script once quoting, streaming, approvals, and result extraction matter. Solo only requires that the wrapper writes the expected structured artifact and exits with a meaningful status code.
 
 ## Phase Outputs
 
@@ -107,15 +138,18 @@ Wrappers should use exit codes intentionally:
 - non-zero: runtime failed; Solo records return code and stops at the failed phase.
 - partial artifacts are allowed; dashboards can link to them through the artifact manifest.
 
-For agent pools, each agent instance gets its own wrapper invocation. Solo records per-agent runtime reports and supports retrying failed agents.
+For legacy agent pools, each agent instance can get its own wrapper invocation. New integrations should usually prefer the runtime's native subagents, agent teams, or workflow engine inside a single Solo phase, because Codex and Claude Code now provide richer coordination, approval, and inspection surfaces than Solo should duplicate.
 
-## When To Add A Special Adapter
+## Adapter Policy
 
-Add a dedicated adapter only after the generic wrapper cannot express a required capability:
+Do not add dedicated Hermes, OpenClaw, Codex CLI, or Claude Code CLI adapters just to mirror their command flags. Use explicit wrapper scripts.
+
+Consider a deeper adapter only for a stable programmatic API that gives Solo something the command wrapper cannot:
 
 - streaming incremental events back into `.solo/state/events.jsonl`,
-- persistent sessions that Solo must manage,
-- structured tool calls that need direct API access,
+- stable thread/session identifiers,
+- structured approvals,
+- machine-readable subagent progress,
 - richer failure classification than return code plus stdout/stderr.
 
-Until then, keep Codex/Claude Code/Hermes/OpenClaw behind `command` runtime profiles.
+The current likely candidate for a spike is Codex SDK/app-server, because it exposes programmatic threads and event streams. Claude Code should stay behind the CLI wrapper until its programmatic surface is needed and stable enough for Solo's protocol.

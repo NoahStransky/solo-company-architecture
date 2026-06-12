@@ -414,9 +414,13 @@ Adapter 建议：
 | `package` | MVP | 只生成执行包和指令文件 |
 | `manual` | MVP | 用户把结果放回 artifacts 后标记完成 |
 | `command` | 当前阶段 | 用通用命令适配器接 Hermes / OpenClaw / Codex / Claude Code / 本地 wrapper |
-| `provider` | 后续可选 | 直接接模型 provider API |
-| `coding-cli` | 后续可选 | Codex / Claude Code 等 coding CLI 的更深封装 |
-| `orchestrator` | 后续可选 | Hermes / OpenClaw 等下层编排系统的更深封装 |
+
+已删除/收缩的方向：
+
+- 不在 `solo-cli` 内直接实现模型 provider API 调用器。
+- 不做 Codex / Claude Code / Hermes / OpenClaw 的专用 CLI flag 镜像 adapter。
+- 不复制 Codex / Claude Code 的 `/goal`、subagents、agent teams、dynamic workflows。
+- 需要深集成时，只针对稳定 programmatic API 做 spike，例如 Codex SDK/app-server 的 thread/event/approval 读取。
 
 ---
 
@@ -492,7 +496,7 @@ Adapter 建议：
 - 新增 `runtime_profiles` 协议，把外部 runtime 配置收敛为可复用 profile。
 - Agent 可通过 `agents.<role>.runtime` 选择 profile；没有设置时走 `execution.default_profile` / `execution.default_adapter`。
 - 新增 `solo setup runtime`，支持 preset、`--command`、`--arg`、`--env`、`--set-default`、`--for <role>`。
-- 当前内置 preset：`package`、`codex`、`claude-code`、`hermes`、`openclaw`。这些是 wrapper 起点，不把外部工具完整配置系统复制进 solo。
+- 当前内置 preset：`package`、`codex`、`claude-code`。Hermes、OpenClaw 或其他 harness 通过显式 `--command` wrapper 接入，避免 Solo 暗示自己内置理解这些工具的会话、记忆或编排模型。
 - `solo status --json` 的 `execution` 增加 `default_profile` 和 runtime profile 列表，方便 `solo-os` 展示能力。
 - 当前验证：`docker compose run --rm test` 通过，`19 passed`。
 
@@ -709,6 +713,16 @@ Adapter 建议：
 - `context` artifact kind 已加入 inspect artifact 分类和 solo-os dashboard contract。
 - 当前验证：`docker compose run --rm test` 通过，`86 passed`。
 
+#### 2026-06-12
+
+根据 Codex / Claude Code 新版能力重新收缩边界：
+
+- 将 Solo 定位调整为 project protocol / handoff / validation / dashboard contract，不再作为 Codex、Claude Code、Hermes 或 OpenClaw 的替代 harness。
+- 删除 `solo setup runtime --preset hermes/openclaw`，这些工具仍可通过显式 `--command` wrapper 接入，但不再作为内置支持展示。
+- 明确不实现通用 provider API adapter、coding-cli 专用 adapter、orchestrator 专用 adapter；Solo 不复制外部工具的模型调用、subagents、agent teams、dynamic workflows、memory 或 approval UX。
+- `docs/protocol/runtime-wrapper-integration.md` 新增 goal-aware wrapper 方向：Solo 把 phase acceptance criteria 交给外部 runtime 的 `/goal` 或等价机制，外部 runtime 负责持续执行，Solo 只验收结构化 artifact 和 exit code。
+- README 将默认表述从“Solo 自己管理 bounded Dev agent pool”调整为“Solo 管阶段/状态/产物，外部 runtime 可在 phase 内部使用原生 subagents/team/workflow”。
+
 ### Progress Snapshot
 
 | Step | 状态 | 说明 |
@@ -718,7 +732,7 @@ Adapter 建议：
 | Step 3: workflow + dispatch | Done | workflow、agent registry、model router、package dispatcher、`solo dispatch` 已实现 |
 | Step 4: status | Done | `solo status` 和 `solo status --json` 已实现 |
 | Step 5: start 薄交互层 | Done | `solo start` 已复用 dispatch/status，暂不做真实 runtime |
-| Step 6: 执行适配器 | Done for generic runtime | `ExecutionAdapter` boundary、`package` adapter、`command` adapter、`solo complete` manual phase advance 已实现；专用 adapter 后续可选 |
+| Step 6: 执行适配器 | Done for generic runtime | `ExecutionAdapter` boundary、`package` adapter、`command` adapter、`solo complete` manual phase advance 已实现；专用 CLI adapter 已删除出路线图 |
 | Docker 测试环境 | Done | `docker compose run --rm test` 可在容器内跑测试 |
 | Runtime 可观测性 | Done | command runtime 结果写入 artifacts，phase 事件记录 dashboard 可读摘要 |
 | solo-os 读取面 | Done | `solo status --json` 暴露 paths 和 execution capabilities |
@@ -750,7 +764,7 @@ Adapter 建议：
 | Protocol compatibility JSON | Done | `status --json` / `inspect --json` 暴露 version、supported version 和 migration 状态 |
 | solo-os contract tests | Done | completed dummy flow 锁住 dashboard、task、message 和 artifact manifest 字段 |
 | solo-os dashboard contract doc | Done | `docs/protocol/solo-os-dashboard-contract.md` 记录 read-only dashboard 协议 |
-| Runtime wrapper integration doc | Done | `docs/protocol/runtime-wrapper-integration.md` 记录真实 CLI runtime 接入策略 |
+| Runtime wrapper integration doc | Done | `docs/protocol/runtime-wrapper-integration.md` 记录真实 CLI runtime 接入策略，并明确不复制外部 runtime 的 goal/subagent/team/workflow |
 | Child-agent tooling sync | Done | `.solo/tooling` manifest、init 自动同步、setup 配置后自动同步、`setup tooling sync/doctor`、`validate` tooling 检查已实现，并通过全量容器测试 |
 | Cross-project handoff protocol | Done | dispatch external/context-file 和 inspect handoff 已实现，并通过全量容器测试 |
 
@@ -853,7 +867,7 @@ solo start
 | `manual complete` 命令或内部 API | `src/solo/commands/complete_cmd.py` |
 | `command` runtime adapter | `src/solo/core/dispatcher.py` |
 | runtime profiles | `src/solo/core/config.py`, `src/solo/commands/setup_cmd.py` |
-| provider / coding-cli / orchestrator adapter | 后续可选 |
+| provider / coding-cli / orchestrator adapter | 已从路线图删除；必要时通过 wrapper 或稳定 SDK spike 接入 |
 
 ---
 
@@ -921,8 +935,9 @@ tests/test_solo/
 
 最新推荐实现顺序：
 
-1. 基于 read-only dashboard contract 开始 solo-os 项目的最小 dashboard 骨架。
-2. 在真实项目中试接一个外部 CLI runtime，并根据实际摩擦补 wrapper 示例。
+1. 在真实项目中试接 Codex 或 Claude Code goal-aware wrapper，让外部 runtime 执行一个完整 Solo phase。
+2. 基于 read-only dashboard contract 开始 solo-os 的最小 dashboard/API 骨架。
+3. 做 Codex SDK/app-server spike，只验证 thread/event/approval 是否值得进入 Solo adapter 层。
 
 旧 MVP 闭环仍然保持：
 

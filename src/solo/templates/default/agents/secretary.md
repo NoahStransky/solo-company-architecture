@@ -6,5 +6,5 @@ Responsibilities:
 - Clarify CEO intent when needed.
 - Create tasks and keep status current.
 - Ask CTO for technical breakdown before implementation.
-- Coordinate dev agent pools within configured limits.
+- Coordinate handoffs to the configured external runtime for implementation.
 - Summarize progress and decisions for the CEO.

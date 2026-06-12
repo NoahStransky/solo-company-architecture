@@ -89,6 +89,33 @@ def test_setup_runtime_package_preset_can_be_default_without_command():
         assert "qa runtime: offline-package" in result.output
 
 
+def test_setup_runtime_non_builtin_harness_uses_explicit_command():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert runner.invoke(main, ["init", "--yes"]).exit_code == 0
+
+        removed_preset = runner.invoke(main, ["setup", "runtime", "hermes", "--preset", "hermes"])
+        assert removed_preset.exit_code != 0
+        assert "Invalid value for '--preset'" in removed_preset.output
+
+        explicit = runner.invoke(
+            main,
+            [
+                "setup",
+                "runtime",
+                "hermes",
+                "--command",
+                "hermes",
+                "--arg",
+                "{instruction}",
+            ],
+        )
+
+        assert explicit.exit_code == 0, explicit.output
+        config = yaml.safe_load(Path(".solo/config.yaml").read_text())
+        assert config["runtime_profiles"]["hermes"]["command"]["command"] == "hermes"
+
+
 def test_setup_runtime_rejects_invalid_env_and_empty_command_profile():
     runner = CliRunner()
     with runner.isolated_filesystem():

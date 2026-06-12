@@ -26,16 +26,6 @@ RUNTIME_PRESETS: Dict[str, RuntimeProfileConfig] = {
         description="Run a local Claude Code CLI wrapper. Adjust args to match your installed CLI.",
         command=CommandRuntimeConfig(command="claude", args=["{instruction}"], timeout=900),
     ),
-    "hermes": RuntimeProfileConfig(
-        adapter="command",
-        description="Run a local Hermes wrapper command.",
-        command=CommandRuntimeConfig(command="hermes", args=["{instruction}"], timeout=900),
-    ),
-    "openclaw": RuntimeProfileConfig(
-        adapter="command",
-        description="Run a local OpenClaw wrapper command.",
-        command=CommandRuntimeConfig(command="openclaw", args=["{instruction}"], timeout=900),
-    ),
 }
 
 
